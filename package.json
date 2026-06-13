@@ -36,6 +36,11 @@
     "@earendil-works/pi-coding-agent": "latest",
     "typescript": "^5.4.0"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'Linting not configured yet'",
+    "format": "echo 'Formatting not configured yet'"
+  },
   "files": [
     "extensions",
     "README.md",
