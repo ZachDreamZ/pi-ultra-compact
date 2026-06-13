@@ -175,7 +175,7 @@ ${conversationText}
 /**
  * Extract file operations from messages
  */
-function extractFileOps(messages: Array<{ role: string; content: unknown }>): {
+function extractFileOps(messages: any[]): {
   added: string[];
   modified: string[];
   deleted: string[];
