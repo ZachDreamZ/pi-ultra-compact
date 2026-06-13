@@ -14,11 +14,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Vendex/pi-ultra-compact"
+    "url": "https://github.com/ZachDreamZ/pi-ultra-compact.git"
   },
-  "homepage": "https://github.com/Vendex/pi-ultra-compact#readme",
+  "homepage": "https://github.com/ZachDreamZ/pi-ultra-compact#readme",
   "bugs": {
-    "url": "https://github.com/Vendex/pi-ultra-compact/issues"
+    "url": "https://github.com/ZachDreamZ/pi-ultra-compact/issues"
   },
   "pi": {
     "extensions": [
