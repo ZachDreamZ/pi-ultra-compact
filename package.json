@@ -1,0 +1,48 @@
+{
+  "name": "pi-ultra-compact",
+  "version": "0.1.0",
+  "description": "Ultra-compact compaction extension for Pi with maximum compression while preserving critical context",
+  "keywords": [
+    "pi-package",
+    "compaction",
+    "compression",
+    "ultra-compact",
+    "context-management",
+    "token-savings"
+  ],
+  "author": "Vendex",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Vendex/pi-ultra-compact"
+  },
+  "homepage": "https://github.com/Vendex/pi-ultra-compact#readme",
+  "bugs": {
+    "url": "https://github.com/Vendex/pi-ultra-compact/issues"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "image": "https://raw.githubusercontent.com/Vendex/pi-ultra-compact/main/assets/screenshot.png"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "latest",
+    "typescript": "^5.4.0"
+  },
+  "files": [
+    "extensions",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
