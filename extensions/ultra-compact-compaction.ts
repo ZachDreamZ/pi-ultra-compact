@@ -19,64 +19,73 @@
 
 import { complete } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
+import {
+	convertToLlm,
+	serializeConversation,
+} from "@earendil-works/pi-coding-agent";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
 interface CompactionConfig {
-  /** Compression level: 'ultra' | 'aggressive' | 'standard' */
-  level: "ultra" | "aggressive" | "standard";
-  /** Model to use for summarization (null = use conversation model) */
-  summaryModel: string | null;
-  /** Maximum summary tokens */
-  maxSummaryTokens: number;
-  /** Keep N most recent tool results verbatim */
-  keepRecentToolResults: number;
-  /** Always preserve file operations */
-  preserveFileOps: boolean;
+	/** Compression level: 'ultra' | 'aggressive' | 'standard' */
+	level: "ultra" | "aggressive" | "standard";
+	/** Model to use for summarization (null = use conversation model) */
+	summaryModel: string | null;
+	/** Maximum summary tokens */
+	maxSummaryTokens: number;
+	/** Keep N most recent tool results verbatim */
+	keepRecentToolResults: number;
+	/** Always preserve file operations */
+	preserveFileOps: boolean;
 }
 
 const DEFAULT_CONFIG: CompactionConfig = {
-  level: "ultra",
-  summaryModel: null, // Use conversation model
-  maxSummaryTokens: 4096,
-  keepRecentToolResults: 3,
-  preserveFileOps: true,
+	level: "ultra",
+	summaryModel: null, // Use conversation model
+	maxSummaryTokens: 4096,
+	keepRecentToolResults: 3,
+	preserveFileOps: true,
 };
 
 /**
  * Load config from settings file
  */
 function loadConfig(): CompactionConfig {
-  try {
-    const settingsPath = join(homedir(), ".pi", "agent", "extensions", "ultra-compact-settings.json");
-    const raw = readFileSync(settingsPath, "utf8");
-    const parsed = JSON.parse(raw);
-    if (parsed.ultraCompactCompaction) {
-      return { ...DEFAULT_CONFIG, ...parsed.ultraCompactCompaction };
-    }
-  } catch {
-    // Settings file not found or invalid, use defaults
-  }
-  return { ...DEFAULT_CONFIG };
+	try {
+		const settingsPath = join(
+			homedir(),
+			".pi",
+			"agent",
+			"extensions",
+			"ultra-compact-settings.json",
+		);
+		const raw = readFileSync(settingsPath, "utf8");
+		const parsed = JSON.parse(raw);
+		if (parsed.ultraCompactCompaction) {
+			return { ...DEFAULT_CONFIG, ...parsed.ultraCompactCompaction };
+		}
+	} catch {
+		// Settings file not found or invalid, use defaults
+	}
+	return { ...DEFAULT_CONFIG };
 }
 
 /**
  * Ultra-compact summary format with maximum information density
  */
 function buildUltraCompactPrompt(
-  conversationText: string,
-  previousSummary: string | undefined,
-  config: CompactionConfig
+	conversationText: string,
+	previousSummary: string | undefined,
+	config: CompactionConfig,
 ): string {
-  const prevContext = previousSummary
-    ? `\n\nPREV_CONTEXT:\n${previousSummary}`
-    : "";
+	const prevContext = previousSummary
+		? `\n\nPREV_CONTEXT:\n${previousSummary}`
+		: "";
 
-  // Compression level affects prompt instructions
-  const compressionInstructions = {
-    ultra: `ULTRA COMPRESSION: Maximize information density. Use abbreviations, shorthand, and compressed notation.
+	// Compression level affects prompt instructions
+	const compressionInstructions = {
+		ultra: `ULTRA COMPRESSION: Maximize information density. Use abbreviations, shorthand, and compressed notation.
 
 FORMAT (follow exactly):
 [GOAL] 1-sentence objective
@@ -87,7 +96,7 @@ FORMAT (follow exactly):
 [CTX] Critical context only (vars, configs, deps)
 [MEM] Memory saves made: list or "none"`,
 
-    aggressive: `AGGRESSIVE COMPRESSION: Condense significantly while preserving key context.
+		aggressive: `AGGRESSIVE COMPRESSION: Condense significantly while preserving key context.
 
 FORMAT:
 ## Goal
@@ -115,7 +124,7 @@ Only essential vars/configs.
 ## Memory
 Saves made.`,
 
-    standard: `Standard compression with good readability.
+		standard: `Standard compression with good readability.
 
 FORMAT:
 ## Goal
@@ -148,9 +157,9 @@ FORMAT:
 
 ## Memory
 - Saves`,
-  };
+	};
 
-  return `You are an ULTRA-COMPACT conversation compressor. Your goal is to preserve ALL critical information while using MINIMUM tokens.
+	return `You are an ULTRA-COMPACT conversation compressor. Your goal is to preserve ALL critical information while using MINIMUM tokens.
 
 ${compressionInstructions[config.level]}
 ${prevContext}
@@ -176,190 +185,208 @@ ${conversationText}
  * Extract file operations from messages
  */
 function extractFileOps(messages: any[]): {
-  added: string[];
-  modified: string[];
-  deleted: string[];
-  read: string[];
+	added: string[];
+	modified: string[];
+	deleted: string[];
+	read: string[];
 } {
-  const ops = { added: [] as string[], modified: [] as string[], deleted: [] as string[], read: [] as string[] };
+	const ops = {
+		added: [] as string[],
+		modified: [] as string[],
+		deleted: [] as string[],
+		read: [] as string[],
+	};
 
-  for (const msg of messages) {
-    if (msg.role !== "assistant") continue;
-    if (!Array.isArray(msg.content)) continue;
+	for (const msg of messages) {
+		if (msg.role !== "assistant") continue;
+		if (!Array.isArray(msg.content)) continue;
 
-    for (const block of msg.content) {
-      if (block.type !== "tool_use") continue;
-      const input = block.input as Record<string, unknown>;
+		for (const block of msg.content) {
+			if (block.type !== "tool_use") continue;
+			const input = block.input as Record<string, unknown>;
 
-      if (block.name === "write" && typeof input.path === "string") {
-        // Check if file existed before
-        if (!ops.read.includes(input.path) && !ops.modified.includes(input.path)) {
-          ops.added.push(input.path);
-        } else {
-          ops.modified.push(input.path);
-        }
-      } else if (block.name === "edit" && typeof input.path === "string") {
-        if (!ops.modified.includes(input.path)) {
-          ops.modified.push(input.path);
-        }
-      } else if (block.name === "bash" && typeof input.command === "string") {
-        const cmd = input.command;
-        if (cmd.includes("rm ") || cmd.includes("del ")) {
-          // Try to extract path
-          const match = cmd.match(/(?:rm|del)\s+(.+)/);
-          if (match) ops.deleted.push(match[1].trim());
-        }
-      } else if (block.name === "read" && typeof input.path === "string") {
-        if (!ops.read.includes(input.path)) {
-          ops.read.push(input.path);
-        }
-      }
-    }
-  }
+			if (block.name === "write" && typeof input.path === "string") {
+				// Check if file existed before
+				if (
+					!ops.read.includes(input.path) &&
+					!ops.modified.includes(input.path)
+				) {
+					ops.added.push(input.path);
+				} else {
+					ops.modified.push(input.path);
+				}
+			} else if (block.name === "edit" && typeof input.path === "string") {
+				if (!ops.modified.includes(input.path)) {
+					ops.modified.push(input.path);
+				}
+			} else if (block.name === "bash" && typeof input.command === "string") {
+				const cmd = input.command;
+				if (cmd.includes("rm ") || cmd.includes("del ")) {
+					// Try to extract path
+					const match = cmd.match(/(?:rm|del)\s+(.+)/);
+					if (match) ops.deleted.push(match[1].trim());
+				}
+			} else if (block.name === "read" && typeof input.path === "string") {
+				if (!ops.read.includes(input.path)) {
+					ops.read.push(input.path);
+				}
+			}
+		}
+	}
 
-  return ops;
+	return ops;
 }
 
 export default function (pi: ExtensionAPI) {
-  pi.on("session_before_compact", async (event, ctx) => {
-    const { preparation, signal } = event;
-    const {
-      messagesToSummarize,
-      turnPrefixMessages,
-      tokensBefore,
-      firstKeptEntryId,
-      previousSummary,
-    } = preparation;
+	pi.on("session_before_compact", async (event, ctx) => {
+		const { preparation, signal } = event;
+		const {
+			messagesToSummarize,
+			turnPrefixMessages,
+			tokensBefore,
+			firstKeptEntryId,
+			previousSummary,
+		} = preparation;
 
-    // Load config from settings file
-    const config = loadConfig();
+		// Load config from settings file
+		const config = loadConfig();
 
-    ctx.ui.notify(
-      `Ultra-compact compaction: ${tokensBefore.toLocaleString()} tokens → ${config.level} compression`,
-      "info"
-    );
+		ctx.ui.notify(
+			`Ultra-compact compaction: ${tokensBefore.toLocaleString()} tokens → ${config.level} compression`,
+			"info",
+		);
 
-    // Combine all messages
-    const allMessages = [...messagesToSummarize, ...turnPrefixMessages];
+		// Combine all messages
+		const allMessages = [...messagesToSummarize, ...turnPrefixMessages];
 
-    // Extract file operations for metadata
-    const fileOps = extractFileOps(allMessages);
+		// Extract file operations for metadata
+		const fileOps = extractFileOps(allMessages);
 
-    // Get model for summarization
-    let model;
-    if (config.summaryModel) {
-      const [provider, modelId] = config.summaryModel.split("/");
-      model = ctx.modelRegistry.find(provider, modelId);
-    }
-    if (!model) {
-      model = ctx.modelRegistry.find("google", "gemini-2.5-flash");
-    }
-    if (!model) {
-      model = ctx.modelRegistry.find("openai", "gpt-4o-mini");
-    }
+		// Get model for summarization
+		let model;
+		if (config.summaryModel) {
+			const [provider, modelId] = config.summaryModel.split("/");
+			model = ctx.modelRegistry.find(provider, modelId);
+		}
+		if (!model) {
+			model = ctx.modelRegistry.find("google", "gemini-2.5-flash");
+		}
+		if (!model) {
+			model = ctx.modelRegistry.find("openai", "gpt-4o-mini");
+		}
 
-    if (!model) {
-      ctx.ui.notify("No suitable model found for compaction", "warning");
-      return;
-    }
+		if (!model) {
+			ctx.ui.notify("No suitable model found for compaction", "warning");
+			return;
+		}
 
-    // Get auth
-    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-    if (!auth.ok || !auth.apiKey) {
-      ctx.ui.notify(`Auth failed for ${model.id}, using default compaction`, "warning");
-      return;
-    }
+		// Get auth
+		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+		if (!auth.ok || !auth.apiKey) {
+			ctx.ui.notify(
+				`Auth failed for ${model.id}, using default compaction`,
+				"warning",
+			);
+			return;
+		}
 
-    // Serialize conversation
-    const conversationText = serializeConversation(convertToLlm(allMessages));
+		// Serialize conversation
+		const conversationText = serializeConversation(convertToLlm(allMessages));
 
-    // Build ultra-compact prompt
-    const promptText = buildUltraCompactPrompt(conversationText, previousSummary, config);
+		// Build ultra-compact prompt
+		const promptText = buildUltraCompactPrompt(
+			conversationText,
+			previousSummary,
+			config,
+		);
 
-    ctx.ui.notify(`Compressing with ${model.id}...`, "info");
+		ctx.ui.notify(`Compressing with ${model.id}...`, "info");
 
-    try {
-      const response = await complete(
-        model,
-        {
-          messages: [
-            {
-              role: "user",
-              content: [{ type: "text", text: promptText }],
-              timestamp: Date.now(),
-            },
-          ],
-        },
-        {
-          apiKey: auth.apiKey,
-          headers: auth.headers,
-          maxTokens: config.maxSummaryTokens,
-          signal,
-        }
-      );
+		try {
+			const response = await complete(
+				model,
+				{
+					messages: [
+						{
+							role: "user",
+							content: [{ type: "text", text: promptText }],
+							timestamp: Date.now(),
+						},
+					],
+				},
+				{
+					apiKey: auth.apiKey,
+					headers: auth.headers,
+					maxTokens: config.maxSummaryTokens,
+					signal,
+				},
+			);
 
-      const summary = response.content
-        .filter((c): c is { type: "text"; text: string } => c.type === "text")
-        .map((c) => c.text)
-        .join("\n");
+			const summary = response.content
+				.filter((c): c is { type: "text"; text: string } => c.type === "text")
+				.map((c) => c.text)
+				.join("\n");
 
-      if (!summary.trim()) {
-        ctx.ui.notify("Compaction summary was empty", "warning");
-        return;
-      }
+			if (!summary.trim()) {
+				ctx.ui.notify("Compaction summary was empty", "warning");
+				return;
+			}
 
-      // Add file operation metadata as comment
-      const metadata = [
-        "<!-- ULTRA_COMPACT_META",
-        `FILES_ADDED: ${fileOps.added.join(",") || "none"}`,
-        `FILES_MODIFIED: ${fileOps.modified.join(",") || "none"}`,
-        `FILES_DELETED: ${fileOps.deleted.join(",") || "none"}`,
-        `TOKENS_BEFORE: ${tokensBefore}`,
-        `COMPRESSION: ${config.level}`,
-        "META -->",
-        "",
-      ].join("\n");
+			// Add file operation metadata as comment
+			const metadata = [
+				"<!-- ULTRA_COMPACT_META",
+				`FILES_ADDED: ${fileOps.added.join(",") || "none"}`,
+				`FILES_MODIFIED: ${fileOps.modified.join(",") || "none"}`,
+				`FILES_DELETED: ${fileOps.deleted.join(",") || "none"}`,
+				`TOKENS_BEFORE: ${tokensBefore}`,
+				`COMPRESSION: ${config.level}`,
+				"META -->",
+				"",
+			].join("\n");
 
-      const fullSummary = metadata + summary;
+			const fullSummary = metadata + summary;
 
-      ctx.ui.notify(
-        `Compaction complete: ${tokensBefore.toLocaleString()} tokens → ${summary.length} chars`,
-        "info"
-      );
+			ctx.ui.notify(
+				`Compaction complete: ${tokensBefore.toLocaleString()} tokens → ${summary.length} chars`,
+				"info",
+			);
 
-      return {
-        compaction: {
-          summary: fullSummary,
-          firstKeptEntryId,
-          tokensBefore,
-          details: {
-            compressionLevel: config.level,
-            filesAdded: fileOps.added,
-            filesModified: fileOps.modified,
-            filesDeleted: fileOps.deleted,
-            filesRead: fileOps.read,
-          },
-        },
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      ctx.ui.notify(`Compaction failed: ${message}`, "error");
-      return;
-    }
-  });
+			return {
+				compaction: {
+					summary: fullSummary,
+					firstKeptEntryId,
+					tokensBefore,
+					details: {
+						compressionLevel: config.level,
+						filesAdded: fileOps.added,
+						filesModified: fileOps.modified,
+						filesDeleted: fileOps.deleted,
+						filesRead: fileOps.read,
+					},
+				},
+			};
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			ctx.ui.notify(`Compaction failed: ${message}`, "error");
+			return;
+		}
+	});
 
-  // Register command to toggle compression level
-  pi.registerCommand("compression-level", {
-    description: "Set compaction compression level (ultra/aggressive/standard)",
-    handler: async (args, ctx) => {
-      const level = args?.trim().toLowerCase();
-      if (!level || !["ultra", "aggressive", "standard"].includes(level)) {
-        ctx.ui.notify("Usage: /compression-level <ultra|aggressive|standard>", "info");
-        return;
-      }
-      // Store in memory for next compaction
-      (globalThis as Record<string, unknown>).__ultraCompactLevel = level;
-      ctx.ui.notify(`Compression level set to: ${level}`, "info");
-    },
-  });
+	// Register command to toggle compression level
+	pi.registerCommand("compression-level", {
+		description: "Set compaction compression level (ultra/aggressive/standard)",
+		handler: async (args, ctx) => {
+			const level = args?.trim().toLowerCase();
+			if (!level || !["ultra", "aggressive", "standard"].includes(level)) {
+				ctx.ui.notify(
+					"Usage: /compression-level <ultra|aggressive|standard>",
+					"info",
+				);
+				return;
+			}
+			// Store in memory for next compaction
+			(globalThis as Record<string, unknown>).__ultraCompactLevel = level;
+			ctx.ui.notify(`Compression level set to: ${level}`, "info");
+		},
+	});
 }

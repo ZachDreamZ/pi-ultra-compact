@@ -1,6 +1,6 @@
 {
   "name": "pi-ultra-compact",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ultra-compact compaction extension for Pi with maximum compression while preserving critical context",
   "keywords": [
     "pi-package",
