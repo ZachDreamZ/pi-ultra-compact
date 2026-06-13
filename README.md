@@ -173,5 +173,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - [Pi](https://pi.dev/) - The AI coding agent
-- [gentle-pi](https://github.com/Gentleman-Programming/gentle-pi) - Senior architect harness
-- [gentle-engram](https://github.com/Gentleman-Programming/engram) - Persistent memory for Pi
