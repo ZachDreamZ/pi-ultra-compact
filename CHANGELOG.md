@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-14
+
+### Added
+
+- **53-test Jest suite** — comprehensive coverage for constructor, context detection, reconfigure, shouldCompact, extractCriticalInfo, generateSummary, model families, edge cases
+- **Null safety guards** — all message-consuming methods (generateSummary, extractCriticalInfo, compressConversation, extractFileOperations, estimateTokens) guard against null/undefined arrays
+- **userThresholdOverride** — custom thresholdTokens preserved across model switches
+
+### Fixed
+
+- **3 Critical regex bugs** — missing `\b` word boundaries caused false matches:
+  - extractFileOperations captured random words as file paths ("Fix the bug" → stored "bug")
+  - extractErrors matched BUG inside "debug", "buggy"
+  - extractNextSteps caught "will" anywhere in text
+  - WILL removed from nextSteps alternation (too common), PROBLEM added to errors, MODIFIED added to file ops
+- **Startup model detection** — pi.model fallback now runs before engine construction, no more "unknown" at boot
+- **reconfigure() clobbered user threshold** — custom thresholdTokens now preserved via userThresholdOverride field
+- **Compression ratio inflation** — tokensAfter now includes kept critical messages, not just summary text
+- **Unclosed backtick** — code block replacement uses `[code: ...]` instead of unclosed backtick
+- **shouldCompact boundary** — changed `>` to `>=` for correct threshold check
+- **Prototype pollution** — Object.hasOwn() used for safe context window lookup
+- **Unused typebox peer dep** — removed
+- **329-line dead code** — extensions/ultra-compact-compaction.ts.disabled deleted
+- **Topic extraction** — strips code blocks before topic detection
+- **messageContent warning** — logs warning for unexpected content types
+
+### Changed
+
+- All regex patterns now have `\b` word boundary anchors
+- Init ordering: pi.model captured before engine construction
+- Compression ratio calculation includes critical messages
+
 ## [0.4.9] - 2026-06-14
 
 ### Fixed

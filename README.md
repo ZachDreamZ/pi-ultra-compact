@@ -97,15 +97,16 @@ Default settings work out of the box. The extension auto-detects your model and 
 
 See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
-### v0.4.6 — Bug Fix Release
+### v0.5.0 — Audit & Stability Release
 
-This release fixes 7 critical bugs found via adversarial audit:
+This release fixes 18 issues found via comprehensive 5-agent audit:
 
-- **Auto-threshold now works** — 80% of context window is applied correctly
-- **No Node.js built-in modules** — fully compatible with Pi extension runtime sandbox
-- **No conflicting handlers** — single `session_before_compact` listener
-- **Null-safe** — guards everywhere for `ctx.session`, `event.preparation`, `Message.content`
-- **Type-safe** — `Message.content` handles both `string` and structured `TextContent[]`
+- **3 Critical regex bugs fixed** — `\b` word boundaries on all patterns, no more false matches
+- **Startup model detection fixed** — correct threshold from boot
+- **Custom thresholds preserved** — across model switches
+- **Null safety** — guards on all message-consuming methods
+- **53-test Jest suite** — comprehensive coverage
+- **Dead code removed** — 329-line `.disabled` file deleted, unused `typebox` dep removed
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 {
   "name": "pi-ultra-compact",
-  "version": "0.4.9",
+  "version": "0.5.0",
   "description": "Advanced compaction extension and skill for Pi with automatic threshold-based compaction and critical context preservation",
   "keywords": [
     "pi-package",
@@ -21,23 +21,29 @@
     "url": "https://github.com/ZachDreamZ/pi-ultra-compact/issues"
   },
   "pi": {
-    "extensions": ["./extensions"],
-    "skills": ["./skills"]
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ]
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    "typebox": "*"
+    "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",
-    "typebox": "latest",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
     "typescript": "^5.4.0"
   },
   "scripts": {
+    "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'Linting not configured yet'",
     "format": "echo 'Formatting not configured yet'"

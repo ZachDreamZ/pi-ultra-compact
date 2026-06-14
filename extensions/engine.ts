@@ -23,6 +23,14 @@ function messageContent(msg: Message): string {
 			.map((block: any): string => block.text ?? "")
 			.join(" ");
 	}
+	// Unexpected content type — log warning instead of silently stringifying
+	if (typeof c !== "string" && !Array.isArray(c)) {
+		console.warn(
+			"[pi-ultra-compact] Unexpected message content type:",
+			typeof c,
+		);
+		return "";
+	}
 	return String(c ?? "");
 }
 
@@ -355,31 +363,31 @@ const IMPORTANCE_WEIGHTS = {
 /** Patterns to detect important information */
 const CRITICAL_PATTERNS = [
 	{
-		pattern: /(?:GOAL|OBJECTIVE|TARGET):?\s*(.+)/i,
+		pattern: /\b(?:GOAL|OBJECTIVE|TARGET)\b:?\s*(.+)/i,
 		weight: IMPORTANCE_WEIGHTS.goal,
 	},
 	{
-		pattern: /(?:DECISION|DECIDED|CHOSE):?\s*(.+)/i,
+		pattern: /\b(?:DECISION|DECIDED|CHOSE)\b:?\s*(.+)/i,
 		weight: IMPORTANCE_WEIGHTS.decision,
 	},
 	{
-		pattern: /(?:ERROR|FAILED|BUG|ISSUE):?\s*(.+)/i,
+		pattern: /\b(?:ERROR|FAILED|BUG|ISSUE|PROBLEM)\b:?\s*(.+)/i,
 		weight: IMPORTANCE_WEIGHTS.error,
 	},
 	{
-		pattern: /(?:DISCOVERED|FOUND|LEARNED|INSIGHT):?\s*(.+)/i,
+		pattern: /\b(?:DISCOVERED|FOUND|LEARNED|INSIGHT)\b:?\s*(.+)/i,
 		weight: IMPORTANCE_WEIGHTS.discovery,
 	},
 	{
-		pattern: /(?:CONSTRAINT|REQUIREMENT|REQUIRED|CONSTRAINED):?\s*(.+)/i,
+		pattern: /\b(?:CONSTRAINT|REQUIREMENT|REQUIRED)\b:?\s*(.+)/i,
 		weight: IMPORTANCE_WEIGHTS.constraint,
 	},
 	{
-		pattern: /(?:FILE|PATH|DIRECTORY):?\s*(.+)/i,
+		pattern: /\b(?:FILE|PATH|DIRECTORY)\b:?\s*(.+)/i,
 		weight: IMPORTANCE_WEIGHTS.file_path,
 	},
 	{
-		pattern: /(?:ADDED|REMOVED|MODIFIED|CHANGED|UPDATED):?\s*(.+)/i,
+		pattern: /\b(?:ADDED|REMOVED|MODIFIED|CHANGED|UPDATED)\b:?\s*(.+)/i,
 		weight: IMPORTANCE_WEIGHTS.code_change,
 	},
 ];
@@ -397,6 +405,9 @@ export class UltraCompactEngine {
 
 	private contextWindow: number;
 
+	/** User-provided threshold override, preserved across reconfigure() calls */
+	private userThresholdOverride?: number;
+
 	constructor(config: Partial<UltraCompactEngine["config"]> = {}) {
 		this.config = {
 			thresholdTokens: config.thresholdTokens ?? 100000,
@@ -405,11 +416,16 @@ export class UltraCompactEngine {
 			modelName: config.modelName,
 		};
 
+		// Save user threshold override before auto-detection may overwrite it
+		if (config.thresholdTokens !== undefined) {
+			this.userThresholdOverride = config.thresholdTokens;
+		}
+
 		// Auto-detect context window from model name
 		this.contextWindow = this.detectContextWindow(this.config.modelName);
 
 		// If no custom threshold provided, use 80% of context window
-		if (!config.thresholdTokens) {
+		if (this.userThresholdOverride === undefined) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
 		}
 	}
@@ -422,8 +438,8 @@ export class UltraCompactEngine {
 
 		const normalized = modelName.toLowerCase();
 
-		// Check for exact match
-		if (MODEL_CONTEXT_WINDOWS[normalized]) {
+		// Check for exact match (with prototype pollution guard)
+		if (Object.hasOwn(MODEL_CONTEXT_WINDOWS, normalized)) {
 			return MODEL_CONTEXT_WINDOWS[normalized];
 		}
 
@@ -463,7 +479,10 @@ export class UltraCompactEngine {
 	public reconfigure(modelName?: string): void {
 		this.config.modelName = modelName;
 		this.contextWindow = this.detectContextWindow(modelName);
-		this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
+		// Only auto-calculate threshold if user didn't provide a custom override
+		if (this.userThresholdOverride === undefined) {
+			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
+		}
 	}
 
 	/**
@@ -514,7 +533,7 @@ export class UltraCompactEngine {
 	 * Check if compaction is needed based on token count
 	 */
 	public shouldCompact(currentTokens: number): boolean {
-		return currentTokens > this.config.thresholdTokens;
+		return currentTokens >= this.config.thresholdTokens;
 	}
 
 	/**
@@ -542,6 +561,11 @@ export class UltraCompactEngine {
 		compressible: Message[];
 		scores: Map<string, number>;
 	} {
+		// Guard against null/undefined messages from Pi event system
+		if (!Array.isArray(messages)) {
+			return { critical: [], compressible: [], scores: new Map() };
+		}
+
 		const critical: Message[] = [];
 		const compressible: Message[] = [];
 		const scores = new Map<string, number>();
@@ -567,6 +591,19 @@ export class UltraCompactEngine {
 		messages: Message[],
 		previousSummary?: string,
 	): CompactionResult {
+		// Guard against null/undefined messages from Pi event system
+		if (!Array.isArray(messages) || messages.length === 0) {
+			return {
+				summary: previousSummary || "",
+				tokensBefore: 0,
+				tokensAfter: 0,
+				compressionRatio: 1,
+				readFiles: [],
+				modifiedFiles: [],
+				timestamp: Date.now(),
+			};
+		}
+
 		// Extract critical information
 		const { critical, compressible } = this.extractCriticalInfo(messages);
 
@@ -595,7 +632,9 @@ export class UltraCompactEngine {
 
 		// Calculate metrics
 		const tokensBefore = this.estimateTokens(messages);
-		const tokensAfter = this.estimateTokens([
+		// tokensAfter = kept critical messages + generated summary
+		const criticalTokens = this.estimateTokens(critical);
+		const summaryTokens = this.estimateTokens([
 			{
 				id: "summary",
 				role: "system",
@@ -603,6 +642,7 @@ export class UltraCompactEngine {
 				timestamp: Date.now(),
 			},
 		]);
+		const tokensAfter = criticalTokens + summaryTokens;
 
 		const fileOps = this.extractFileOperations(messages);
 
@@ -701,7 +741,8 @@ export class UltraCompactEngine {
 	 */
 	private extractGoals(messages: Message[]): string[] {
 		const goals: string[] = [];
-		const goalPattern = /(?:GOAL|OBJECTIVE|TARGET|WANT TO|TRYING TO):?\s*(.+)/i;
+		const goalPattern =
+			/\b(?:GOAL|OBJECTIVE|TARGET|WANT TO|TRYING TO)\b:?\s*(.+)/i;
 
 		for (const msg of messages) {
 			const text = messageContent(msg);
@@ -719,8 +760,7 @@ export class UltraCompactEngine {
 	 */
 	private extractDecisions(messages: Message[]): string[] {
 		const decisions: string[] = [];
-		const decisionPattern =
-			/(?:DECIDED|DECISION|CHOSE|SELECTED|WILL USE):?\s*(.+)/i;
+		const decisionPattern = /\b(?:DECIDED|DECISION|CHOSE|SELECTED)\b:?\s*(.+)/i;
 
 		for (const msg of messages) {
 			const text = messageContent(msg);
@@ -738,8 +778,8 @@ export class UltraCompactEngine {
 	 */
 	private extractErrors(messages: Message[]): string[] {
 		const errors: string[] = [];
-		const errorPattern = /(?:ERROR|FAILED|BUG|ISSUE|PROBLEM):?\s*(.+)/i;
-		const solutionPattern = /(?:SOLUTION|FIX|RESOLVED|FIXED):?\s*(.+)/i;
+		const errorPattern = /\b(?:ERROR|FAILED|BUG|ISSUE|PROBLEM)\b:?\s*(.+)/i;
+		const solutionPattern = /\b(?:SOLUTION|FIX|RESOLVED|FIXED)\b:?\s*(.+)/i;
 
 		for (const msg of messages) {
 			const text = messageContent(msg);
@@ -768,6 +808,11 @@ export class UltraCompactEngine {
 		read: string[];
 		modified: string[];
 	} {
+		// Guard against null/undefined messages from Pi event system
+		if (!Array.isArray(messages)) {
+			return { read: [], modified: [] };
+		}
+
 		const read: string[] = [];
 		const modified: string[] = [];
 
@@ -780,8 +825,8 @@ export class UltraCompactEngine {
 
 		// Patterns that match WRITE/EDIT operations in conversation text
 		const modifiedPatterns = [
-			/\b(?:edit|write|update|change|create|add|fix|delete|remove)\s+(?:the\s+)?(?:file\s+)?(?:`|"|\u2018|\u2019)?([\w./\\-]+)(?:`|"|\u2018|\u2019)?(?:\b|\s|$)/gi,
-			/\b(?:edit|write|update|change|create|add|fix|delete|remove)\s+\(?(?:path[=:])?[`"']?([\w./\\-]+)[`"']?\)?/gi,
+			/\b(?:edit|write|update|change|create|add|fix|delete|remove|modify|modifies|modified)\s+(?:the\s+)?(?:file\s+)?(?:`|"|\u2018|\u2019)?([\w./\\-]+)(?:`|"|\u2018|\u2019)?(?:\b|\s|$)/gi,
+			/\b(?:edit|write|update|change|create|add|fix|delete|remove|modify|modifies|modified)\s+\(?(?:path[=:])?[`"']?([\w./\\-]+)[`"']?\)?/gi,
 		];
 
 		for (const msg of messages) {
@@ -829,7 +874,7 @@ export class UltraCompactEngine {
 	 */
 	private extractNextSteps(messages: Message[]): string[] {
 		const steps: string[] = [];
-		const stepPattern = /(?:NEXT|TODO|SHOULD|WILL|PLAN TO|NEED TO):?\s*(.+)/i;
+		const stepPattern = /\b(?:NEXT|TODO|SHOULD|PLAN TO|NEED TO)\b:?\s*(.+)/i;
 
 		for (const msg of messages) {
 			const text = messageContent(msg);
@@ -846,7 +891,7 @@ export class UltraCompactEngine {
 	 * Compress conversation into a summary
 	 */
 	private compressConversation(messages: Message[]): string {
-		if (messages.length === 0) return "";
+		if (!Array.isArray(messages) || messages.length === 0) return "";
 
 		const summary: string[] = [];
 		let currentTopic = "";
@@ -874,12 +919,15 @@ export class UltraCompactEngine {
 	 * Extract topic from message content
 	 */
 	private extractTopic(content: string): string {
+		// Strip code blocks before topic extraction to avoid truncated syntax
+		const cleanContent = content.replace(/```[\s\S]*?```/g, "");
+
 		// Look for explicit topic markers
-		const topicMatch = content.match(/(?:TOPIC|SUBJECT|ABOUT):?\s*(.+)/i);
+		const topicMatch = cleanContent.match(/(?:TOPIC|SUBJECT|ABOUT):?\s*(.+)/i);
 		if (topicMatch) return topicMatch[1].trim();
 
 		// Use first sentence as topic
-		const firstSentence = content.split(/[.!?]/)[0];
+		const firstSentence = cleanContent.split(/[.!?]/)[0];
 		if (firstSentence && firstSentence.length < 100) {
 			return firstSentence.trim();
 		}
@@ -894,7 +942,7 @@ export class UltraCompactEngine {
 		// Remove code blocks (keep first line only)
 		let compressed = content.replace(/```[\s\S]*?```/g, (match) => {
 			const firstLine = match.split("\n")[1] || "";
-			return `\`code: ${firstLine.substring(0, 50)}\``;
+			return `[code: ${firstLine.substring(0, 50)}]`;
 		});
 
 		// Remove excessive whitespace
@@ -912,6 +960,8 @@ export class UltraCompactEngine {
 	 * Estimate token count (rough approximation)
 	 */
 	private estimateTokens(messages: Message[]): number {
+		if (!Array.isArray(messages)) return 0;
+
 		let total = 0;
 		for (const msg of messages) {
 			// Rough estimate: 1 token per 4 characters
