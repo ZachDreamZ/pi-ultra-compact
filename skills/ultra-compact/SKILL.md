@@ -4,7 +4,7 @@ description: "Advanced compaction skill for Pi with automatic threshold-based co
 license: MIT
 metadata:
   author: Vendex
-  version: "0.4.7"
+  version: "0.4.8"
 ---
 
 # Ultra-Compact Compaction

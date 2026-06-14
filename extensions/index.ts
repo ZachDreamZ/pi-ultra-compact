@@ -11,6 +11,9 @@
 import { UltraCompactEngine } from "./engine";
 import type { UltraCompactConfig, CompactionResult } from "./types";
 
+/** Track current model at runtime (updated by model_select event) */
+let currentModel: { id?: string; contextWindow?: number } | undefined;
+
 /** Default configuration — thresholdTokens omitted so engine auto-detects from model context window */
 const DEFAULT_CONFIG: UltraCompactConfig = {
 	keepPercentage: 0.3,
@@ -55,10 +58,25 @@ function formatCompactionResult(result: CompactionResult): string {
 
 /**
  * Attempt to extract model name from Pi context.
+ * Tries multiple sources so model changes are reflected at runtime:
+ * 1. pi.model (ExtensionAPI at init)
+ * 2. currentModel (tracked via model_select event)
  * Falls back to undefined, letting the engine use a default context window.
  */
-function getModelName(pi: any): string | undefined {
-	return pi.model || undefined;
+function getModelName(): string | undefined {
+	return currentModel?.id || undefined;
+}
+
+/**
+ * Reconfigure the engine to match the current model before a compaction operation.
+ * Ensures the threshold adapts even if the user changed models mid-session.
+ */
+function reconfigureEngineForCurrentModel(engine: UltraCompactEngine): void {
+	let modelId: string | undefined;
+	if (currentModel?.id) {
+		modelId = currentModel.id;
+	}
+	engine.reconfigure(modelId);
 }
 
 /**
@@ -73,6 +91,9 @@ function handleUltracompactCommand(
 			ctx.ui.notify("Session not available for compaction.", "error");
 			return;
 		}
+
+		// Reconfigure engine to current model before compaction
+		reconfigureEngineForCurrentModel(engine);
 
 		ctx.ui.notify("Starting ultra-compact compaction...", "info");
 
@@ -113,6 +134,9 @@ function handleBeforeCompact(
 	engine: UltraCompactEngine,
 ): (event: any, ctx: any) => Record<string, any> | undefined {
 	return (event: any, ctx: any) => {
+		// Reconfigure engine to current model before checking threshold
+		reconfigureEngineForCurrentModel(engine);
+
 		const preparation = event?.preparation;
 		if (!preparation) {
 			return undefined;
@@ -183,8 +207,8 @@ export default function piUltraCompact(
 ): void {
 	const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
-	// Try to get model name from Pi context
-	const modelName = getModelName(pi);
+	// Try to get model name from Pi context (init-time, updated at runtime via model_select)
+	const modelName = getModelName();
 
 	const engine = new UltraCompactEngine({
 		...mergedConfig,
@@ -200,6 +224,27 @@ export default function piUltraCompact(
 			"Ultra-compact compaction with maximum compression while preserving critical context.",
 		handler: handleUltracompactCommand(engine, mergedConfig),
 	});
+
+	// Track model changes at runtime so compaction adapts when user switches models
+	pi.on("model_select", (event: any, _ctx: any) => {
+		if (event?.model) {
+			currentModel = {
+				id: event.model.id || event.model.name,
+				contextWindow: event.model.contextWindow,
+			};
+			console.log(
+				`[pi-ultra-compact] Model updated: ${currentModel.id} (${currentModel.contextWindow?.toLocaleString() ?? "unknown"} context)`,
+			);
+		}
+	});
+
+	// Also try to capture model from session if available (init-time fallback)
+	if (pi.model) {
+		currentModel = {
+			id: pi.model,
+			contextWindow: undefined,
+		};
+	}
 
 	// Register automatic compaction hook (single handler)
 	if (mergedConfig.autoCompact) {

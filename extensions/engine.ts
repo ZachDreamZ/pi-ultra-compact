@@ -456,6 +456,17 @@ export class UltraCompactEngine {
 	}
 
 	/**
+	 * Dynamically reconfigure the engine with a new model name.
+	 * Re-detects the context window and recalculates the threshold.
+	 * Safe to call mid-session when the user changes models.
+	 */
+	public reconfigure(modelName?: string): void {
+		this.config.modelName = modelName;
+		this.contextWindow = this.detectContextWindow(modelName);
+		this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
+	}
+
+	/**
 	 * Get the detected context window size
 	 */
 	public getContextWindow(): number {

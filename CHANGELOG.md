@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.8] - 2026-06-14
+
+### Added
+
+- **Dynamic model tracking** — extension now subscribes to `model_select` event to detect model changes at runtime. When the user switches models (via `/model` or `Ctrl+P`), the engine automatically recalculates the context window and compaction threshold for the new model.
+- **`UltraCompactEngine.reconfigure()`** — new public method that updates the engine's model name, context window, and threshold on-the-fly without recreating the engine.
+
+### Fixed
+
+- **Model detection was init-only** — `getModelName()` only ran once at extension load time via `pi.model`. If the user changed models mid-session, the engine kept using the original threshold. Now both `/ultracompact` and `session_before_compact` call `reconfigureEngineForCurrentModel()` before every compaction operation.
+- **`pi.model` fallback** — captured from the ExtensionAPI at init time even before the first `model_select` event fires.
+
 ## [0.4.7] - 2026-06-14
 
 ### Fixed
