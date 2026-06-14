@@ -18,7 +18,7 @@ Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic
 ## Installation
 
 ```bash
-pi install pi-ultra-compact
+pi install npm:pi-ultra-compact
 ```
 
 ## Quick Start
@@ -97,7 +97,7 @@ Default settings work out of the box. The extension auto-detects your model and 
 
 ### Extension not loading
 - Restart Pi after installation
-- Check `pi install pi-ultra-compact` completed successfully
+- Check `pi install npm:pi-ultra-compact` completed successfully
 
 ### Wrong threshold detected
 - The extension auto-detects your model from Pi config

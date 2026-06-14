@@ -122,7 +122,7 @@ After compaction, verify:
 ## Installation
 
 ```bash
-pi install pi-ultra-compact
+pi install npm:pi-ultra-compact
 ```
 
 ## Commands
