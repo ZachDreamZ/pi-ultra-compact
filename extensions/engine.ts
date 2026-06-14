@@ -10,6 +10,320 @@
 
 import type { CompactionResult, Message } from "./types";
 
+/**
+ * Comprehensive model context window sizes (in tokens)
+ * Updated: June 2025
+ */
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+	// ==================== OPENAI ====================
+	// GPT-5 Series (2025)
+	"gpt-5": 400000,
+	"gpt-5-pro": 400000,
+	"gpt-5-mini": 400000,
+	"gpt-5-nano": 400000,
+	"gpt-5-codex": 400000,
+	"gpt-5.1": 400000,
+	"gpt-5.1-pro": 400000,
+	"gpt-5.1-codex": 400000,
+	"gpt-5.1-codex-max": 400000,
+	"gpt-5.2": 400000,
+	"gpt-5.2-pro": 400000,
+	// GPT-4.1 Series (2025)
+	"gpt-4.1": 1047576,
+	"gpt-4.1-mini": 1047576,
+	"gpt-4.1-nano": 1047576,
+	// GPT-4o Series
+	"gpt-4o": 128000,
+	"gpt-4o-mini": 128000,
+	"gpt-4o-all": 128000,
+	// GPT-4 Legacy
+	"gpt-4-turbo": 128000,
+	"gpt-4-turbo-preview": 128000,
+	"gpt-4": 8192,
+	"gpt-4-32k": 32768,
+	// GPT-3.5
+	"gpt-3.5-turbo": 16385,
+	"gpt-3.5-turbo-16k": 16385,
+	// O-Series Reasoning
+	"o1": 200000,
+	"o1-mini": 128000,
+	"o1-preview": 128000,
+	"o1-pro": 200000,
+	"o3": 200000,
+	"o3-mini": 200000,
+	"o3-pro": 200000,
+	"o4-mini": 200000,
+	// OpenAI OSS
+	"gpt-oss-120b": 128000,
+	"gpt-oss-20b": 128000,
+
+	// ==================== ANTHROPIC ====================
+	// Claude 4.5 Series (2025)
+	"claude-4.5-opus": 200000,
+	"claude-4.5-sonnet": 200000,
+	// Claude 4.0 Series
+	"claude-4.0-sonnet": 200000,
+	// Claude 3.7
+	"claude-3.7-sonnet": 200000,
+	"claude-3.7-sonnet-extended": 1000000,
+	// Claude 3.5 Series
+	"claude-3.5-sonnet": 200000,
+	"claude-3.5-haiku": 200000,
+	// Claude 3 Series
+	"claude-3-opus": 200000,
+	"claude-3-sonnet": 200000,
+	"claude-3-haiku": 200000,
+	// Generic Claude
+	"claude-opus": 200000,
+	"claude-sonnet": 200000,
+	"claude-haiku": 200000,
+
+	// ==================== GOOGLE ====================
+	// Gemini 2.5 Series (2025)
+	"gemini-2.5-pro": 1000000,
+	"gemini-2.5-pro-exp": 1000000,
+	"gemini-2.5-flash": 1000000,
+	"gemini-2.5-flash-lite": 1000000,
+	// Gemini 2.0 Series
+	"gemini-2.0-flash": 1000000,
+	"gemini-2.0-flash-lite": 1000000,
+	"gemini-2.0-pro": 2000000,
+	// Gemini 1.5 Series
+	"gemini-1.5-pro": 2000000,
+	"gemini-1.5-flash": 1000000,
+	"gemini-1.5-flash-8b": 1000000,
+	// Gemini 1.0
+	"gemini-pro": 32768,
+	"gemini-pro-vision": 16384,
+	// Gemma (Open Models)
+	"gemma-3-27b": 128000,
+	"gemma-3-12b": 128000,
+	"gemma-3-4b": 32000,
+	"gemma-2-27b": 8192,
+	"gemma-2-9b": 8192,
+	"gemma-2-2b": 8192,
+	"gemma-7b": 8192,
+	"gemma-2b": 2048,
+
+	// ==================== DEEPSEEK ====================
+	// DeepSeek V4 Series (2025)
+	"deepseek-v4-pro": 1000000,
+	"deepseek-v4": 128000,
+	// DeepSeek V3 Series
+	"deepseek-v3": 65536,
+	"deepseek-v3-chat": 65536,
+	"deepseek-v3-0324": 65536,
+	// DeepSeek V2 Series
+	"deepseek-v2.5": 131072,
+	"deepseek-v2.5-1210": 131072,
+	"deepseek-v2": 131072,
+	"deepseek-v2-chat": 131072,
+	// DeepSeek Coder
+	"deepseek-coder-v2": 131072,
+	"deepseek-coder": 131072,
+	"deepseek-coder-33b": 16384,
+	"deepseek-coder-6.7b": 16384,
+	"deepseek-coder-1.3b": 4096,
+	// DeepSeek Reasoner
+	"deepseek-r1": 65536,
+	"deepseek-r1-0528": 65536,
+	"deepseek-reasoner": 65536,
+	// DeepSeek LLM
+	"deepseek-llm-67b-chat": 16384,
+	"deepseek-llm-7b-chat": 4096,
+
+	// ==================== META LLAMA ====================
+	// Llama 4 Series (2025)
+	"llama-4-maverick": 1000000,
+	"llama-4-scout": 1000000,
+	// Llama 3.3
+	"llama-3.3-70b": 128000,
+	"llama-3.3-70b-instruct": 128000,
+	// Llama 3.1 Series
+	"llama-3.1-405b": 128000,
+	"llama-3.1-405b-instruct": 128000,
+	"llama-3.1-70b": 128000,
+	"llama-3.1-70b-instruct": 128000,
+	"llama-3.1-8b": 128000,
+	"llama-3.1-8b-instruct": 128000,
+	"llama-3.1-4b": 128000,
+	"llama-3.1-1b": 128000,
+	// Llama 3 Series
+	"llama-3-70b": 8192,
+	"llama-3-70b-instruct": 8192,
+	"llama-3-8b": 8192,
+	"llama-3-8b-instruct": 8192,
+	"llama-3-70b-chat": 8192,
+	"llama-3-8b-chat": 8192,
+	// Llama 2 Series
+	"llama-2-70b": 4096,
+	"llama-2-70b-chat": 4096,
+	"llama-2-13b": 4096,
+	"llama-2-13b-chat": 4096,
+	"llama-2-7b": 4096,
+	"llama-2-7b-chat": 4096,
+	// Llama Legacy
+	"llama-70b": 2048,
+	"llama-13b": 2048,
+	"llama-7b": 2048,
+
+	// ==================== MISTRAL ====================
+	// Mistral Medium Series (2025)
+	"mistral-medium-3.5": 128000,
+	"mistral-medium-3.1": 128000,
+	"mistral-medium-3": 128000,
+	"mistral-medium": 32000,
+	// Mistral Large Series
+	"mistral-large-3": 128000,
+	"mistral-large-2.1": 128000,
+	"mistral-large-2.0": 128000,
+	"mistral-large": 32000,
+	// Mistral Small Series
+	"mistral-small-4": 128000,
+	"mistral-small-3.2": 128000,
+	"mistral-small-3.1": 128000,
+	"mistral-small-3.0": 32000,
+	"mistral-small-2.0": 32000,
+	"mistral-small": 32000,
+	// Ministral Series
+	"ministral-3-14b": 128000,
+	"ministral-3-8b": 128000,
+	"ministral-3-3b": 128000,
+	"ministral-8b": 32000,
+	"ministral-3b": 32000,
+	// Mistral Nemo
+	"mistral-nemo-12b": 128000,
+	"mistral-nemo": 128000,
+	// Codestral
+	"codestral": 256000,
+	"codestral-25-08": 256000,
+	"codestral-mamba-7b": 256000,
+	// Pixtral
+	"pixtral-large": 128000,
+	"pixtral-12b": 128000,
+	// Devstral
+	"devstral-2": 128000,
+	"devstral-small-2": 128000,
+	"devstral-medium": 128000,
+	"devstral-small": 128000,
+	// Magistral
+	"magistral-medium-1.2": 128000,
+	"magistral-small-1.2": 128000,
+	"magistral-medium-1.1": 128000,
+	"magistral-small-1.1": 128000,
+	"magistral-medium-1.0": 128000,
+	"magistral-small-1.0": 128000,
+	// Mixtral
+	"mixtral-8x22b": 65536,
+	"mixtral-8x7b": 32768,
+	// Mistral Legacy
+	"mistral-7b": 32000,
+	"mistral-tiny": 32000,
+	"mistral-7b-instruct": 32000,
+
+	// ==================== QWEN (Alibaba) ====================
+	// Qwen3 Series (2025)
+	"qwen3-235b-a22b": 128000,
+	"qwen3-30b-a3b": 128000,
+	"qwen3-32b": 128000,
+	"qwen3-14b": 128000,
+	"qwen3-8b": 128000,
+	"qwen3-4b": 32000,
+	"qwen3-1.7b": 32000,
+	"qwen3-0.6b": 32000,
+	// Qwen2.5 Series
+	"qwen2.5-72b-instruct": 128000,
+	"qwen2.5-32b-instruct": 128000,
+	"qwen2.5-14b-instruct": 128000,
+	"qwen2.5-7b-instruct": 128000,
+	"qwen2.5-3b-instruct": 128000,
+	"qwen2.5-coder-32b": 128000,
+	"qwen2.5-coder-14b": 128000,
+	"qwen2.5-coder-7b": 128000,
+	"qwen2.5-coder-3b": 128000,
+	"qwen2.5-math-72b": 128000,
+	"qwen2.5-math-7b": 128000,
+	"qwen2.5-72b": 128000,
+	"qwen2.5-32b": 128000,
+	"qwen2.5-14b": 128000,
+	"qwen2.5-7b": 128000,
+	"qwen2.5-3b": 128000,
+	// Qwen2 Series
+	"qwen2-72b-instruct": 128000,
+	"qwen2-7b-instruct": 128000,
+	"qwen2-72b": 128000,
+	"qwen2-7b": 32768,
+	// Qwen Legacy
+	"qwen-72b": 32768,
+	"qwen-14b": 8192,
+	"qwen-7b": 8192,
+	"qwen-1.8b": 8192,
+	// Qwen-Plus/Max/Turbo (API)
+	"qwen-plus": 128000,
+	"qwen-max": 32000,
+	"qwen-turbo": 128000,
+
+	// ==================== MICROSOFT PHI ====================
+	// Phi-4 Series
+	"phi-4": 16384,
+	"phi-4-mini": 8192,
+	"phi-4-reasoning": 32768,
+	// Phi-3 Series
+	"phi-3-medium-128k": 128000,
+	"phi-3-medium": 4096,
+	"phi-3-small-128k": 128000,
+	"phi-3-small": 8192,
+	"phi-3-mini-128k": 128000,
+	"phi-3-mini": 4096,
+	// Phi-2
+	"phi-2": 2048,
+	// Phi-1
+	"phi-1": 2048,
+	"phi-1.5": 2048,
+
+	// ==================== COHERE ====================
+	"command-r-plus-08-2024": 128000,
+	"command-r-plus": 128000,
+	"command-r": 128000,
+	"command-light": 4096,
+	"command": 2048,
+
+	// ==================== YI (01.AI) ====================
+	"yi-1.5-34b-chat": 200000,
+	"yi-1.5-9b-chat": 200000,
+	"yi-1.5-6b-chat": 200000,
+	"yi-34b-chat": 200000,
+	"yi-6b-chat": 200000,
+	"yi-34b": 4096,
+	"yi-6b": 4096,
+
+	// ==================== BAAI ====================
+	"bge-large-en-v1.5": 512,
+	"bge-base-en-v1.5": 512,
+	"bge-small-en-v1.5": 512,
+
+	// ==================== NVIDIA ====================
+	"nemotron-4-340b": 4096,
+	"nemotron-4-340b-instruct": 4096,
+
+	// ==================== XAI (Grok) ====================
+	"grok-3": 131072,
+	"grok-3-mini": 131072,
+	"grok-2": 131072,
+	"grok-2-mini": 131072,
+	"grok-1": 8192,
+
+	// ==================== INFLECTION ====================
+	"pi-1": 8192,
+	"pi-2": 8192,
+
+	// ==================== ALIBABA QWEN (API) ====================
+	"qwen-long": 10000000,
+
+	// ==================== DEFAULT ====================
+	"default": 128000,
+};
+
 /** Weight factors for information importance */
 const IMPORTANCE_WEIGHTS = {
 	goal: 1.0,
@@ -62,13 +376,93 @@ export class UltraCompactEngine {
 		thresholdTokens: number;
 		keepPercentage: number;
 		maxKeepTokens: number;
+		modelName?: string;
 	};
+
+	private contextWindow: number;
 
 	constructor(config: Partial<UltraCompactEngine["config"]> = {}) {
 		this.config = {
 			thresholdTokens: config.thresholdTokens ?? 100000,
 			keepPercentage: config.keepPercentage ?? 0.3,
 			maxKeepTokens: config.maxKeepTokens ?? 30000,
+			modelName: config.modelName,
+		};
+
+		// Auto-detect context window from model name
+		this.contextWindow = this.detectContextWindow(this.config.modelName);
+
+		// If no custom threshold provided, use 80% of context window
+		if (!config.thresholdTokens && this.config.modelName) {
+			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
+		}
+	}
+
+	/**
+	 * Detect context window size from model name
+	 */
+	private detectContextWindow(modelName?: string): number {
+		if (!modelName) return MODEL_CONTEXT_WINDOWS["default"];
+
+		const normalized = modelName.toLowerCase();
+
+		// Check for exact match
+		if (MODEL_CONTEXT_WINDOWS[normalized]) {
+			return MODEL_CONTEXT_WINDOWS[normalized];
+		}
+
+		// Check for partial match
+		for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
+			if (normalized.includes(key) || key.includes(normalized)) {
+				return value;
+			}
+		}
+
+		// Check for model family patterns
+		if (normalized.includes("claude")) return 200000;
+		if (normalized.includes("gpt-4o")) return 128000;
+		if (normalized.includes("gpt-4")) return 8192;
+		if (normalized.includes("gemini") && normalized.includes("pro")) return 1000000;
+		if (normalized.includes("gemini")) return 1000000;
+		if (normalized.includes("deepseek") && normalized.includes("v4")) return 1000000;
+		if (normalized.includes("deepseek")) return 128000;
+		if (normalized.includes("llama")) return 128000;
+		if (normalized.includes("mistral")) return 128000;
+
+		return MODEL_CONTEXT_WINDOWS["default"];
+	}
+
+	/**
+	 * Get the detected context window size
+	 */
+	public getContextWindow(): number {
+		return this.contextWindow;
+	}
+
+	/**
+	 * Get model-specific recommendations
+	 */
+	public getModelRecommendations(): {
+		contextWindow: number;
+		recommendedThreshold: number;
+		recommendedKeep: number;
+		modelFamily: string;
+	} {
+		const modelFamily = this.config.modelName?.toLowerCase() || "unknown";
+		let family = "unknown";
+
+		if (modelFamily.includes("claude")) family = "anthropic";
+		else if (modelFamily.includes("gpt")) family = "openai";
+		else if (modelFamily.includes("gemini")) family = "google";
+		else if (modelFamily.includes("deepseek")) family = "deepseek";
+		else if (modelFamily.includes("llama")) family = "meta";
+		else if (modelFamily.includes("mistral")) family = "mistral";
+
+		return {
+			contextWindow: this.contextWindow,
+			recommendedThreshold: Math.floor(this.contextWindow * 0.8),
+			recommendedKeep: Math.floor(this.contextWindow * 0.2),
+			modelFamily: family,
 		};
 	}
 

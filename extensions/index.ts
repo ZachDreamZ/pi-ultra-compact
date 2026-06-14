@@ -58,11 +58,26 @@ function formatCompactionResult(result: CompactionResult): string {
  * Pi extension factory function
  */
 export default function piUltraCompact(
-	pi: any,
+	 pi: any,
 	config: UltraCompactConfig = {},
 ): void {
 	const mergedConfig = { ...DEFAULT_CONFIG, ...config };
-	const engine = new UltraCompactEngine(mergedConfig);
+
+	// Try to get model name from Pi context
+	const modelName = mergedConfig.customPrompt?.includes("model") 
+		? undefined 
+		: (pi.config?.model || pi.model || undefined);
+
+	const engine = new UltraCompactEngine({
+		...mergedConfig,
+		modelName,
+	});
+
+	// Log model detection
+	const recommendations = engine.getModelRecommendations();
+	console.log(`[pi-ultra-compact] Detected model family: ${recommendations.modelFamily}`);
+	console.log(`[pi-ultra-compact] Context window: ${recommendations.contextWindow.toLocaleString()} tokens`);
+	console.log(`[pi-ultra-compact] Auto-compact threshold: ${mergedConfig.thresholdTokens?.toLocaleString() || Math.floor(recommendations.contextWindow * 0.8).toLocaleString()} tokens`);
 
 	// Register /ultracompact command
 	pi.registerCommand("ultracompact", {
