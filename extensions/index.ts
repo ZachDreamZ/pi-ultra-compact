@@ -54,6 +54,19 @@ function formatCompactionResult(result: CompactionResult): string {
 	return lines.join("\n");
 }
 
+function getModelName(pi: any, config: UltraCompactConfig): string | undefined {
+	if (config.customPrompt?.includes("model")) return undefined;
+	return pi.config?.model || pi.model || undefined;
+}
+
+function logModelInfo(engine: UltraCompactEngine, config: UltraCompactConfig): void {
+	const recommendations = engine.getModelRecommendations();
+	console.log(`[pi-ultra-compact] Detected model family: ${recommendations.modelFamily}`);
+	console.log(`[pi-ultra-compact] Context window: ${recommendations.contextWindow.toLocaleString()} tokens`);
+	const threshold = config.thresholdTokens?.toLocaleString() || Math.floor(recommendations.contextWindow * 0.8).toLocaleString();
+	console.log(`[pi-ultra-compact] Auto-compact threshold: ${threshold} tokens`);
+}
+
 /**
  * Pi extension factory function
  */
@@ -64,9 +77,7 @@ export default function piUltraCompact(
 	const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
 	// Try to get model name from Pi context
-	const modelName = mergedConfig.customPrompt?.includes("model") 
-		? undefined 
-		: (pi.config?.model || pi.model || undefined);
+	const modelName = getModelName(pi, mergedConfig);
 
 	const engine = new UltraCompactEngine({
 		...mergedConfig,
@@ -74,10 +85,7 @@ export default function piUltraCompact(
 	});
 
 	// Log model detection
-	const recommendations = engine.getModelRecommendations();
-	console.log(`[pi-ultra-compact] Detected model family: ${recommendations.modelFamily}`);
-	console.log(`[pi-ultra-compact] Context window: ${recommendations.contextWindow.toLocaleString()} tokens`);
-	console.log(`[pi-ultra-compact] Auto-compact threshold: ${mergedConfig.thresholdTokens?.toLocaleString() || Math.floor(recommendations.contextWindow * 0.8).toLocaleString()} tokens`);
+	logModelInfo(engine, mergedConfig);
 
 	// Register /ultracompact command
 	pi.registerCommand("ultracompact", {

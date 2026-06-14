@@ -45,11 +45,11 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 	"gpt-3.5-turbo": 16385,
 	"gpt-3.5-turbo-16k": 16385,
 	// O-Series Reasoning
-	"o1": 200000,
+	o1: 200000,
 	"o1-mini": 128000,
 	"o1-preview": 128000,
 	"o1-pro": 200000,
-	"o3": 200000,
+	o3: 200000,
 	"o3-mini": 200000,
 	"o3-pro": 200000,
 	"o4-mini": 200000,
@@ -195,7 +195,7 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 	"mistral-nemo-12b": 128000,
 	"mistral-nemo": 128000,
 	// Codestral
-	"codestral": 256000,
+	codestral: 256000,
 	"codestral-25-08": 256000,
 	"codestral-mamba-7b": 256000,
 	// Pixtral
@@ -286,7 +286,7 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 	"command-r-plus": 128000,
 	"command-r": 128000,
 	"command-light": 4096,
-	"command": 2048,
+	command: 2048,
 
 	// ==================== YI (01.AI) ====================
 	"yi-1.5-34b-chat": 200000,
@@ -321,7 +321,7 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 	"qwen-long": 10000000,
 
 	// ==================== DEFAULT ====================
-	"default": 128000,
+	default: 128000,
 };
 
 /** Weight factors for information importance */
@@ -418,16 +418,23 @@ export class UltraCompactEngine {
 			}
 		}
 
-		// Check for model family patterns
-		if (normalized.includes("claude")) return 200000;
-		if (normalized.includes("gpt-4o")) return 128000;
-		if (normalized.includes("gpt-4")) return 8192;
-		if (normalized.includes("gemini") && normalized.includes("pro")) return 1000000;
-		if (normalized.includes("gemini")) return 1000000;
-		if (normalized.includes("deepseek") && normalized.includes("v4")) return 1000000;
-		if (normalized.includes("deepseek")) return 128000;
-		if (normalized.includes("llama")) return 128000;
-		if (normalized.includes("mistral")) return 128000;
+		return this.detectFromFamily(normalized);
+	}
+
+	private detectFromFamily(normalized: string): number {
+		const familyDefaults: [string, number][] = [
+			["claude", 200000],
+			["gpt-4o", 128000],
+			["gpt-4", 8192],
+			["gemini", 1000000],
+			["deepseek", 128000],
+			["llama", 128000],
+			["mistral", 128000],
+		];
+
+		for (const [family, defaultWindow] of familyDefaults) {
+			if (normalized.includes(family)) return defaultWindow;
+		}
 
 		return MODEL_CONTEXT_WINDOWS["default"];
 	}
@@ -449,14 +456,7 @@ export class UltraCompactEngine {
 		modelFamily: string;
 	} {
 		const modelFamily = this.config.modelName?.toLowerCase() || "unknown";
-		let family = "unknown";
-
-		if (modelFamily.includes("claude")) family = "anthropic";
-		else if (modelFamily.includes("gpt")) family = "openai";
-		else if (modelFamily.includes("gemini")) family = "google";
-		else if (modelFamily.includes("deepseek")) family = "deepseek";
-		else if (modelFamily.includes("llama")) family = "meta";
-		else if (modelFamily.includes("mistral")) family = "mistral";
+		const family = this.detectModelFamily(modelFamily);
 
 		return {
 			contextWindow: this.contextWindow,
@@ -464,6 +464,23 @@ export class UltraCompactEngine {
 			recommendedKeep: Math.floor(this.contextWindow * 0.2),
 			modelFamily: family,
 		};
+	}
+
+	private detectModelFamily(modelName: string): string {
+		const familyPatterns: [string, string][] = [
+			["claude", "anthropic"],
+			["gpt", "openai"],
+			["gemini", "google"],
+			["deepseek", "deepseek"],
+			["llama", "meta"],
+			["mistral", "mistral"],
+		];
+
+		for (const [pattern, family] of familyPatterns) {
+			if (modelName.includes(pattern)) return family;
+		}
+
+		return "unknown";
 	}
 
 	/**
