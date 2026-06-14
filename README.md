@@ -93,6 +93,20 @@ Default settings work out of the box. The extension auto-detects your model and 
 - Compatible with gentle-pi (SDD/OpenSpec)
 - No conflicts with Pi's default compaction
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
+
+### v0.4.6 — Bug Fix Release
+
+This release fixes 7 critical bugs found via adversarial audit:
+
+- **Auto-threshold now works** — 80% of context window is applied correctly
+- **No Node.js built-in modules** — fully compatible with Pi extension runtime sandbox
+- **No conflicting handlers** — single `session_before_compact` listener
+- **Null-safe** — guards everywhere for `ctx.session`, `event.preparation`, `Message.content`
+- **Type-safe** — `Message.content` handles both `string` and structured `TextContent[]`
+
 ## Troubleshooting
 
 ### Extension not loading
@@ -102,6 +116,7 @@ Default settings work out of the box. The extension auto-detects your model and 
 ### Wrong threshold detected
 - The extension auto-detects your model from Pi config
 - Ensure your model is in the supported list (200+ models)
+- Run `/ultracompact` manually to see detected model and threshold in the logs
 
 ## Contributing
 

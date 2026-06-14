@@ -8,7 +8,7 @@ Use this skill when:
 - Session context is approaching limits
 - You need to compress conversation history while preserving critical information
 - Manual compaction is needed via `/ultracompact`
-- Auto-compaction triggers at 80% of model's context window
+- Auto-compaction triggers when context exceeds 80% of your model's detected context window
 
 ## Supported Models
 
@@ -36,11 +36,18 @@ Use the `/ultracompact` command for manual compaction:
 
 ### 2. Auto-Compaction
 
-Auto-compaction triggers when context exceeds 80% of your model's context window:
-- Claude Opus: 160,000 tokens
-- GPT-5: 320,000 tokens
-- Gemini 2.5 Pro: 800,000 tokens
-- DeepSeek V4 Pro: 800,000 tokens
+The extension auto-detects your model from Pi's configuration and sets the threshold at 80% of its context window:
+
+| Model | Context Window | Threshold (80%) |
+|-------|---------------|-----------------|
+| Claude Opus/Sonnet | 200,000 | 160,000 |
+| GPT-5 | 400,000 | 320,000 |
+| GPT-4.1 | 1,047,576 | ~838,000 |
+| Gemini 2.5 Pro | 1,000,000 | 800,000 |
+| DeepSeek V4 Pro | 1,000,000 | 800,000 |
+| Default (unknown model) | 128,000 | 102,400 |
+
+If the model cannot be detected (e.g., no model name available), a safe default threshold of 100,000 tokens is used.
 
 ### 3. Critical Information Extraction
 
@@ -108,7 +115,7 @@ Modified:
 - **Losing context**: Always preserve the current goal and next steps
 - **Breaking references**: Keep file paths and function names intact
 - **Forgetting decisions**: Always preserve the reasoning behind choices
-- **Wrong threshold**: Extension auto-detects model - don't manually set unless needed
+- **Wrong threshold**: Extension auto-detects from model - set `thresholdTokens` explicitly in config only to override
 
 ## Verification
 
@@ -130,3 +137,6 @@ pi install npm:pi-ultra-compact
 | Command | Description |
 |---------|-------------|
 | `/ultracompact` | Trigger manual ultra-compact compaction |
+
+> **Note:** `/compression-level` was removed. Compression uses the engine-based approach with automatic model-aware thresholds.
+

@@ -11,10 +11,6 @@
  * - Configurable compression levels
  * - Automatic Engram memory backup when available
  * - Minimal token usage while preserving critical context
- *
- * Usage:
- *   Automatically installed in ~/.pi/agent/extensions/
- *   Pi auto-discovers and loads on startup
  */
 
 import { complete } from "@earendil-works/pi-ai";
@@ -23,9 +19,6 @@ import {
 	convertToLlm,
 	serializeConversation,
 } from "@earendil-works/pi-coding-agent";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
 
 interface CompactionConfig {
 	/** Compression level: 'ultra' | 'aggressive' | 'standard' */
@@ -48,27 +41,18 @@ const DEFAULT_CONFIG: CompactionConfig = {
 	preserveFileOps: true,
 };
 
+// In-memory state for compression level (set via /compression-level command)
+let _compressionLevel: "ultra" | "aggressive" | "standard" = "ultra";
+
 /**
- * Load config from settings file
+ * Load config from settings — no Node.js modules, uses provided config
  */
-function loadConfig(): CompactionConfig {
-	try {
-		const settingsPath = join(
-			homedir(),
-			".pi",
-			"agent",
-			"extensions",
-			"ultra-compact-settings.json",
-		);
-		const raw = readFileSync(settingsPath, "utf8");
-		const parsed = JSON.parse(raw);
-		if (parsed.ultraCompactCompaction) {
-			return { ...DEFAULT_CONFIG, ...parsed.ultraCompactCompaction };
-		}
-	} catch {
-		// Settings file not found or invalid, use defaults
+function loadConfig(level?: string): CompactionConfig {
+	const config = { ...DEFAULT_CONFIG };
+	if (level && ["ultra", "aggressive", "standard"].includes(level)) {
+		config.level = level as CompactionConfig["level"];
 	}
-	return { ...DEFAULT_CONFIG };
+	return config;
 }
 
 /**
@@ -182,7 +166,7 @@ ${conversationText}
 }
 
 /**
- * Extract file operations from messages
+ * Extract file operations from messages (Pi structured format)
  */
 function extractFileOps(messages: any[]): {
 	added: string[];
@@ -199,14 +183,15 @@ function extractFileOps(messages: any[]): {
 
 	for (const msg of messages) {
 		if (msg.role !== "assistant") continue;
-		if (!Array.isArray(msg.content)) continue;
 
-		for (const block of msg.content) {
+		// Handle both Pi's content-block format and simple text format
+		const contentBlocks = Array.isArray(msg.content) ? msg.content : [];
+
+		for (const block of contentBlocks) {
 			if (block.type !== "tool_use") continue;
 			const input = block.input as Record<string, unknown>;
 
 			if (block.name === "write" && typeof input.path === "string") {
-				// Check if file existed before
 				if (
 					!ops.read.includes(input.path) &&
 					!ops.modified.includes(input.path)
@@ -222,7 +207,6 @@ function extractFileOps(messages: any[]): {
 			} else if (block.name === "bash" && typeof input.command === "string") {
 				const cmd = input.command;
 				if (cmd.includes("rm ") || cmd.includes("del ")) {
-					// Try to extract path
 					const match = cmd.match(/(?:rm|del)\s+(.+)/);
 					if (match) ops.deleted.push(match[1].trim());
 				}
@@ -248,8 +232,8 @@ export default function (pi: ExtensionAPI) {
 			previousSummary,
 		} = preparation;
 
-		// Load config from settings file
-		const config = loadConfig();
+		// Load config from in-memory state
+		const config = loadConfig(_compressionLevel);
 
 		ctx.ui.notify(
 			`Ultra-compact compaction: ${tokensBefore.toLocaleString()} tokens → ${config.level} compression`,
@@ -384,9 +368,11 @@ export default function (pi: ExtensionAPI) {
 				);
 				return;
 			}
-			// Store in memory for next compaction
-			(globalThis as Record<string, unknown>).__ultraCompactLevel = level;
-			ctx.ui.notify(`Compression level set to: ${level}`, "info");
+			_compressionLevel = level as "ultra" | "aggressive" | "standard";
+			ctx.ui.notify(
+				`Compression level set to: ${level} (next compaction)`,
+				"info",
+			);
 		},
 	});
 }

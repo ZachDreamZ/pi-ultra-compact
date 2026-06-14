@@ -11,6 +11,22 @@
 import type { CompactionResult, Message } from "./types";
 
 /**
+ * Normalize message content to string, handling both plain text and structured arrays.
+ * Pi's AgentMessage content may be string or (TextContent | ImageContent)[].
+ */
+function messageContent(msg: Message): string {
+	const c = msg.content;
+	if (typeof c === "string") return c;
+	if (Array.isArray(c)) {
+		return c
+			.filter((block: any): boolean => block?.type === "text")
+			.map((block: any): string => block.text ?? "")
+			.join(" ");
+	}
+	return String(c ?? "");
+}
+
+/**
  * Comprehensive model context window sizes (in tokens)
  * Updated: June 2025
  */
@@ -393,7 +409,7 @@ export class UltraCompactEngine {
 		this.contextWindow = this.detectContextWindow(this.config.modelName);
 
 		// If no custom threshold provided, use 80% of context window
-		if (!config.thresholdTokens && this.config.modelName) {
+		if (!config.thresholdTokens) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
 		}
 	}
@@ -491,6 +507,13 @@ export class UltraCompactEngine {
 	}
 
 	/**
+	 * Get the effective threshold used by shouldCompact (for logging)
+	 */
+	public shouldCompactDefaultThreshold(): number {
+		return this.config.thresholdTokens;
+	}
+
+	/**
 	 * Calculate how many tokens to keep
 	 */
 	public calculateKeepTokens(currentTokens: number): number {
@@ -576,7 +599,7 @@ export class UltraCompactEngine {
 			summary,
 			tokensBefore,
 			tokensAfter,
-			compressionRatio: tokensAfter / tokensBefore,
+			compressionRatio: tokensBefore > 0 ? tokensAfter / tokensBefore : 1,
 			readFiles: fileOps.read,
 			modifiedFiles: fileOps.modified,
 			timestamp: Date.now(),
@@ -641,20 +664,21 @@ export class UltraCompactEngine {
 	 */
 	private calculateMessageImportance(message: Message): number {
 		let maxWeight = 0;
+		const text = messageContent(message);
 
 		for (const { pattern, weight } of CRITICAL_PATTERNS) {
-			if (pattern.test(message.content)) {
+			if (pattern.test(text)) {
 				maxWeight = Math.max(maxWeight, weight);
 			}
 		}
 
 		// Boost for tool calls (contain actions)
-		if (message.role === "tool" || message.content.includes("```")) {
+		if (message.role === "tool" || text.includes("```")) {
 			maxWeight = Math.max(maxWeight, 0.5);
 		}
 
 		// Decay for long conversations
-		if (message.content.length > 1000) {
+		if (text.length > 1000) {
 			maxWeight *= 0.8;
 		}
 
@@ -669,7 +693,8 @@ export class UltraCompactEngine {
 		const goalPattern = /(?:GOAL|OBJECTIVE|TARGET|WANT TO|TRYING TO):?\s*(.+)/i;
 
 		for (const msg of messages) {
-			const match = msg.content.match(goalPattern);
+			const text = messageContent(msg);
+			const match = text.match(goalPattern);
 			if (match) {
 				goals.push(match[1].trim());
 			}
@@ -687,7 +712,8 @@ export class UltraCompactEngine {
 			/(?:DECIDED|DECISION|CHOSE|SELECTED|WILL USE):?\s*(.+)/i;
 
 		for (const msg of messages) {
-			const match = msg.content.match(decisionPattern);
+			const text = messageContent(msg);
+			const match = text.match(decisionPattern);
 			if (match) {
 				decisions.push(match[1].trim());
 			}
@@ -705,8 +731,9 @@ export class UltraCompactEngine {
 		const solutionPattern = /(?:SOLUTION|FIX|RESOLVED|FIXED):?\s*(.+)/i;
 
 		for (const msg of messages) {
-			const errorMatch = msg.content.match(errorPattern);
-			const solutionMatch = msg.content.match(solutionPattern);
+			const text = messageContent(msg);
+			const errorMatch = text.match(errorPattern);
+			const solutionMatch = text.match(solutionPattern);
 
 			if (errorMatch) {
 				const error = errorMatch[1].trim();
@@ -720,6 +747,11 @@ export class UltraCompactEngine {
 
 	/**
 	 * Extract file operations from messages
+	 *
+	 * Matches patterns found in Pi conversation text:
+	 * - "read path/to/file.ext" or "I read path/to/file"
+	 * - "edit path/to/file.ext" or "I modified path/to/file"
+	 * - bash code blocks referencing file paths
 	 */
 	private extractFileOperations(messages: Message[]): {
 		read: string[];
@@ -728,27 +760,40 @@ export class UltraCompactEngine {
 		const read: string[] = [];
 		const modified: string[] = [];
 
+		// Patterns that match READ operations in conversation text
+		const readPatterns = [
+			/\bread\s+(?:the\s+)?(?:file\s+)?(?:`|"|\u2018|\u2019)?([\w./\\-]+)(?:`|"|\u2018|\u2019)?(?:\b|\s|$)/gi,
+			/\bread(?:ing)?\s+(?:the\s+)?(?:file\s+)?[`"']?([\w./\\-]+)[`"']?\b/gi,
+			/\bread\s*\{?\s*path\s*[=:]\s*["']?([\w./\\-]+)["']?\s*\}?/gi,
+		];
+
+		// Patterns that match WRITE/EDIT operations in conversation text
+		const modifiedPatterns = [
+			/\b(?:edit|write|update|change|create|add|fix|delete|remove)\s+(?:the\s+)?(?:file\s+)?(?:`|"|\u2018|\u2019)?([\w./\\-]+)(?:`|"|\u2018|\u2019)?(?:\b|\s|$)/gi,
+			/\b(?:edit|write|update|change|create|add|fix|delete|remove)\s+\(?(?:path[=:])?[`"']?([\w./\\-]+)[`"']?\)?/gi,
+		];
+
 		for (const msg of messages) {
-			// Extract read operations
-			const readMatches = msg.content.matchAll(
-				/read\((?:path[=:])["']?([^"')]+)["']?\)/gi,
-			);
-			for (const match of readMatches) {
-				read.push(match[1]);
+			const content = messageContent(msg);
+
+			// Match read patterns
+			for (const pattern of readPatterns) {
+				const matches = content.matchAll(pattern);
+				for (const match of matches) {
+					if (match[1]) read.push(match[1].trim());
+				}
 			}
 
-			// Extract write/edit operations
-			const editMatches = msg.content.matchAll(
-				/(?:edit|write)\((?:path[=:])["']?([^"')]+)["']?\)/gi,
-			);
-			for (const match of editMatches) {
-				modified.push(match[1]);
+			// Match write/edit patterns
+			for (const pattern of modifiedPatterns) {
+				const matches = content.matchAll(pattern);
+				for (const match of matches) {
+					if (match[1]) modified.push(match[1].trim());
+				}
 			}
 
-			// Extract bash commands that modify files
-			const bashMatches = msg.content.matchAll(
-				/bash\(command[=:]["']([^"']+)["']\)/gi,
-			);
+			// Extract bash commands that modify files (from code blocks)
+			const bashMatches = content.matchAll(/```(?:bash)?\s*\n?([\s\S]*?)```/gi);
 			for (const match of bashMatches) {
 				const cmd = match[1];
 				if (
@@ -776,7 +821,8 @@ export class UltraCompactEngine {
 		const stepPattern = /(?:NEXT|TODO|SHOULD|WILL|PLAN TO|NEED TO):?\s*(.+)/i;
 
 		for (const msg of messages) {
-			const match = msg.content.match(stepPattern);
+			const text = messageContent(msg);
+			const match = text.match(stepPattern);
 			if (match) {
 				steps.push(match[1].trim());
 			}
@@ -795,15 +841,16 @@ export class UltraCompactEngine {
 		let currentTopic = "";
 
 		for (const msg of messages) {
+			const text = messageContent(msg);
 			// Extract topic from message
-			const topic = this.extractTopic(msg.content);
+			const topic = this.extractTopic(text);
 			if (topic && topic !== currentTopic) {
 				currentTopic = topic;
 				summary.push(`\n**${topic}**`);
 			}
 
 			// Add compressed version of message
-			const compressed = this.compressMessage(msg.content);
+			const compressed = this.compressMessage(text);
 			if (compressed) {
 				summary.push(`- ${compressed}`);
 			}
@@ -857,7 +904,7 @@ export class UltraCompactEngine {
 		let total = 0;
 		for (const msg of messages) {
 			// Rough estimate: 1 token per 4 characters
-			total += Math.ceil(msg.content.length / 4);
+			total += Math.ceil(messageContent(msg).length / 4);
 		}
 		return total;
 	}

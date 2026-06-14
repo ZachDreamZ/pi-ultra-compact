@@ -11,9 +11,8 @@
 import { UltraCompactEngine } from "./engine";
 import type { UltraCompactConfig, CompactionResult } from "./types";
 
-/** Default configuration */
+/** Default configuration — thresholdTokens omitted so engine auto-detects from model context window */
 const DEFAULT_CONFIG: UltraCompactConfig = {
-	thresholdTokens: 100000,
 	keepPercentage: 0.3,
 	maxKeepTokens: 30000,
 	autoCompact: true,
@@ -54,9 +53,108 @@ function formatCompactionResult(result: CompactionResult): string {
 	return lines.join("\n");
 }
 
-function getModelName(pi: any, config: UltraCompactConfig): string | undefined {
-	if (config.customPrompt?.includes("model")) return undefined;
-	return pi.config?.model || pi.model || undefined;
+/**
+ * Attempt to extract model name from Pi context.
+ * Falls back to undefined, letting the engine use a default context window.
+ */
+function getModelName(pi: any): string | undefined {
+	return pi.model || undefined;
+}
+
+/**
+ * Handle /ultracompact command — manual compaction request.
+ */
+function handleUltracompactCommand(
+	engine: UltraCompactEngine,
+	mergedConfig: UltraCompactConfig,
+): (_args: any, ctx: any) => void {
+	return (_args: any, ctx: any) => {
+		if (!ctx.session) {
+			ctx.ui.notify("Session not available for compaction.", "error");
+			return;
+		}
+
+		ctx.ui.notify("Starting ultra-compact compaction...", "info");
+
+		try {
+			const messages = ctx.session.messages || [];
+
+			if (messages.length === 0) {
+				ctx.ui.notify("No messages to compact.", "warning");
+				return;
+			}
+
+			const previousSummary = ctx.session.summary || undefined;
+			const result = engine.generateSummary(messages, previousSummary);
+
+			// Apply compaction via session API when available, fallback to direct mutation
+			if (typeof ctx.session.applyCompaction === "function") {
+				ctx.session.applyCompaction(result.summary);
+			} else {
+				ctx.session.summary = result.summary;
+				const keepPercentage = mergedConfig.keepPercentage ?? 0.3;
+				ctx.session.messages = messages.slice(
+					-Math.ceil(messages.length * keepPercentage),
+				);
+			}
+
+			ctx.ui.notify(formatCompactionResult(result), "success");
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			ctx.ui.notify(`Ultra-compact failed: ${message}`, "error");
+		}
+	};
+}
+
+/**
+ * Handle session_before_compact event — automatic compaction intercept.
+ */
+function handleBeforeCompact(
+	engine: UltraCompactEngine,
+): (event: any, ctx: any) => Record<string, any> | undefined {
+	return (event: any, ctx: any) => {
+		const preparation = event?.preparation;
+		if (!preparation) {
+			return undefined;
+		}
+		const currentTokens = preparation.tokensBefore;
+
+		if (!engine.shouldCompact(currentTokens)) {
+			return undefined;
+		}
+
+		ctx.ui.notify(
+			`Ultra-compact threshold reached (${currentTokens.toLocaleString()} > ${engine.shouldCompactDefaultThreshold().toLocaleString()}), using advanced compaction...`,
+			"info",
+		);
+
+		try {
+			const result = engine.generateSummary(
+				preparation.messagesToSummarize,
+				preparation.previousSummary,
+			);
+
+			return {
+				compaction: {
+					summary: result.summary,
+					firstKeptEntryId: preparation.firstKeptEntryId,
+					tokensBefore: preparation.tokensBefore,
+					details: {
+						readFiles: result.readFiles,
+						modifiedFiles: result.modifiedFiles,
+						ultracompact: true,
+						compressionRatio: result.compressionRatio,
+					},
+				},
+			};
+		} catch (error) {
+			console.error(
+				"[pi-ultra-compact] Auto-compaction failed, falling back to default:",
+				error,
+			);
+			return undefined;
+		}
+	};
 }
 
 function logModelInfo(
@@ -86,7 +184,7 @@ export default function piUltraCompact(
 	const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
 	// Try to get model name from Pi context
-	const modelName = getModelName(pi, mergedConfig);
+	const modelName = getModelName(pi);
 
 	const engine = new UltraCompactEngine({
 		...mergedConfig,
@@ -100,100 +198,18 @@ export default function piUltraCompact(
 	pi.registerCommand("ultracompact", {
 		description:
 			"Ultra-compact compaction with maximum compression while preserving critical context.",
-		handler: (_args: any, ctx: any) => {
-			ctx.ui.notify("Starting ultra-compact compaction...", "info");
-
-			try {
-				// Get session messages
-				const messages = ctx.session.messages || [];
-
-				if (messages.length === 0) {
-					ctx.ui.notify("No messages to compact.", "warning");
-					return;
-				}
-
-				// Get previous summary if exists
-				const previousSummary = ctx.session.summary || undefined;
-
-				// Generate compact summary
-				const result = engine.generateSummary(messages, previousSummary);
-
-				// Apply compaction
-				ctx.session.summary = result.summary;
-				const keepPercentage = mergedConfig.keepPercentage ?? 0.3;
-				ctx.session.messages = messages.slice(
-					-Math.ceil(messages.length * keepPercentage),
-				);
-
-				// Show result
-				ctx.ui.notify(formatCompactionResult(result), "success");
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				ctx.ui.notify(`Ultra-compact failed: ${message}`, "error");
-			}
-		},
+		handler: handleUltracompactCommand(engine, mergedConfig),
 	});
 
-	// Register automatic compaction hook
+	// Register automatic compaction hook (single handler)
 	if (mergedConfig.autoCompact) {
-		pi.on("session_before_compact", (event: any, ctx: any) => {
-			const { preparation } = event;
-			const currentTokens = preparation.tokensBefore;
-
-			// Check if we should use ultra-compact instead
-			if (engine.shouldCompact(currentTokens)) {
-				ctx.ui.notify(
-					"Ultra-compact threshold reached, using advanced compaction...",
-					"info",
-				);
-
-				try {
-					// Use our engine for better compaction
-					const result = engine.generateSummary(
-						preparation.messagesToSummarize,
-						preparation.previousSummary,
-					);
-
-					// Return custom compaction
-					return {
-						compaction: {
-							summary: result.summary,
-							firstKeptEntryId: preparation.firstKeptEntryId,
-							tokensBefore: preparation.tokensBefore,
-							details: {
-								readFiles: result.readFiles,
-								modifiedFiles: result.modifiedFiles,
-								ultracompact: true,
-								compressionRatio: result.compressionRatio,
-							},
-						},
-					};
-				} catch (error) {
-					console.error(
-						"[pi-ultra-compact] Auto-compaction failed, falling back to default:",
-						error,
-					);
-					// Fall back to default compaction
-					return undefined;
-				}
-			}
-
-			// Let default compaction handle it
-			return undefined;
-		});
-
-		pi.on("session_before_compact", (_event: any, ctx: any) => {
-			ctx.ui.notify(
-				`[Ultra-Compact] Threshold: ${mergedConfig.thresholdTokens?.toLocaleString()} tokens`,
-				"info",
-			);
-		});
+		pi.on("session_before_compact", handleBeforeCompact(engine));
 	}
 
 	// Log initialization
 	console.log("[pi-ultra-compact] Extension loaded");
 	console.log(
-		`  Threshold: ${mergedConfig.thresholdTokens?.toLocaleString()} tokens`,
+		`  Threshold: ${engine.shouldCompactDefaultThreshold().toLocaleString()} tokens (model: ${engine.getContextWindow().toLocaleString()})`,
 	);
 	console.log(
 		`  Keep percentage: ${(mergedConfig.keepPercentage ?? 0.3) * 100}%`,

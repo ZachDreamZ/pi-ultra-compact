@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.6] - 2026-06-14
+
+### Fixed
+
+- **Critical: Auto-threshold never worked** — `DEFAULT_CONFIG` hardcoded `thresholdTokens: 100000`, bypassing 80% context-window auto-detection. Removed from DEFAULT_CONFIG so the engine now auto-detects threshold at 80% of model context window
+- **Critical: Node.js built-in modules** — `ultra-compact-compaction.ts` used `readFileSync`, `join`, `homedir` which crash the Pi extension runtime sandbox. File disabled, logic consolidated into `index.ts`
+- **Critical: Dual conflicting handlers** — both `index.ts` and `ultra-compact-compaction.ts` registered `session_before_compact`. Removed the conflicting file; single handler remains in `index.ts`
+- **Critical: `ctx.session` null crash** — `/ultracompact` command accessed `ctx.session.messages` without null guard. Added early return when session is unavailable
+- **Critical: `event.preparation` null crash** — `session_before_compact` handler destructured `preparation` without guard. Added null check with fallback to default compaction
+- **Critical: `Message.content` type mismatch** — typed as `string` but Pi uses `string | Content[]`. Calling `.match()` on array content crashed at runtime. Added `TextContent`/`ImageContent` interfaces, union type, and `messageContent()` normalization helper
+- **Critical: Auto-threshold required model name** — engine required `modelName` to trigger 80% auto-detection, but `getModelName()` always returned `undefined` (no `pi.config` on ExtensionAPI). Removed the model-name requirement; auto-threshold now uses context window regardless
+- `getModelName()` had nonsensical logic returning `undefined` when custom prompt contained the word "model". Removed
+- `extractFileOperations` regex searched for JS function-call syntax (`read(path="file.ts")`) never present in real Pi messages. Updated to match Pi conversation format
+- `/compression-level` command stored to `globalThis` but nothing ever read it back. Dead code removed
+- High cyclomatic complexity in factory function refactored: extracted `handleUltracompactCommand()` and `handleBeforeCompact()` as separate named functions
+- SKILL.md documented 80% auto-detection but actual default was hardcoded 100K. Updated to match engine behavior
+
+### Changed
+
+- README updated with accurate feature descriptions and fix notes
+- Removed `ultra-compact-compaction.ts` (disabled); all extension logic consolidated in `index.ts` + `engine.ts`
+
 ## [0.4.3] - 2025-06-14
 
 ### Changed

@@ -44,11 +44,23 @@ export interface CompactionEntry {
 	compressionRatio: number;
 }
 
+/** Text content block in Pi messages */
+export interface TextContent {
+	type: "text";
+	text: string;
+}
+
+/** Image content block in Pi messages */
+export interface ImageContent {
+	type: "image";
+	source?: { type: "base64"; media_type: string; data: string };
+}
+
 /** Message structure for Pi sessions */
 export interface Message {
 	id: string;
 	role: "user" | "assistant" | "tool" | "system";
-	content: string;
+	content: string | (TextContent | ImageContent)[];
 	timestamp: number;
 	tokens?: number;
 }
