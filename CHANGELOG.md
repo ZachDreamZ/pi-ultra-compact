@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-06-14
+
+### Added
+
+- Comprehensive model context window support (200+ models)
+- Auto-detect model family for threshold calculation
+- Model-specific recommendations (context window, threshold, keep tokens)
+- Support for OpenAI GPT-5/4.1/4o/O-series models
+- Support for Anthropic Claude 4.5/4.0/3.7/3.5/3 models
+- Support for Google Gemini 2.5/2.0/1.5 and Gemma models
+- Support for DeepSeek V4/V3/V2/R1 models
+- Support for Meta Llama 4/3.3/3.1/3/2 models
+- Support for Mistral Medium/Large/Small/Ministral/Codestral models
+- Support for Qwen3/Qwen2.5/Qwen2 models
+- Support for Microsoft Phi-4/3/2 models
+- Support for Cohere, Yi, xAI Grok, Nvidia models
+
+### Changed
+
+- Default threshold now adapts to model's context window (80% of max)
+- Improved model detection with partial and family matching
+
 ## [0.3.0] - 2024-06-13
 
 ### Added
