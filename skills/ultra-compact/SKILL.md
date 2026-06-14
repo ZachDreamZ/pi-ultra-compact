@@ -1,3 +1,12 @@
+---
+name: ultra-compact
+description: "Advanced compaction skill for Pi with automatic threshold-based compaction and support for 200+ models. Trigger: session context approaching limits, manual /ultracompact command, or auto-compaction at 80% of model context window."
+license: MIT
+metadata:
+  author: Vendex
+  version: "0.4.7"
+---
+
 # Ultra-Compact Compaction
 
 Advanced compaction skill for Pi with automatic threshold-based compaction and support for 200+ models.
