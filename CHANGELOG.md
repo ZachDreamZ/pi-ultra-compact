@@ -5,19 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.8] - 2026-06-14
-
-### Added
-
-- **Dynamic model tracking** — extension now subscribes to `model_select` event to detect model changes at runtime. When the user switches models (via `/model` or `Ctrl+P`), the engine automatically recalculates the context window and compaction threshold for the new model.
-- **`UltraCompactEngine.reconfigure()`** — new public method that updates the engine's model name, context window, and threshold on-the-fly without recreating the engine.
+## [0.4.9] - 2026-06-14
 
 ### Fixed
 
-- **Model detection was init-only** — `getModelName()` only ran once at extension load time via `pi.model`. If the user changed models mid-session, the engine kept using the original threshold. Now both `/ultracompact` and `session_before_compact` call `reconfigureEngineForCurrentModel()` before every compaction operation.
-- **`pi.model` fallback** — captured from the ExtensionAPI at init time even before the first `model_select` event fires.
+- **`/ultracompact` command always failed with "Session not available"** — the command handler accessed `ctx.session` which does not exist on Pi's `ExtensionCommandContext`. The correct API is `ctx.compact()` which fires Pi's built-in compaction flow. Changed the handler to delegate to `ctx.compact()`; our `session_before_compact` hook intercepts and applies ultra-compact logic.
+- **Manual compaction now respects `customInstructions`** — `session_before_compact` handler checks for `event.customInstructions === "ultracompact"` to skip the threshold check for manual requests, so `/ultracompact` always compacts regardless of token count.
+- **Additional model fallback in compaction hook** — `session_before_compact` now also reads `ctx.model.id` at runtime for maximum detection accuracy.
 
-## [0.4.7] - 2026-06-14
+### Changed
+
+- Removed `formatCompactionResult()` and direct `ctx.session` mutation — all compaction goes through Pi's official `compact()` API now.
+
+## [0.4.8] - 2026-06-14
 
 ### Fixed
 

@@ -9,7 +9,7 @@
  */
 
 import { UltraCompactEngine } from "./engine";
-import type { UltraCompactConfig, CompactionResult } from "./types";
+import type { UltraCompactConfig } from "./types";
 
 /** Track current model at runtime (updated by model_select event) */
 let currentModel: { id?: string; contextWindow?: number } | undefined;
@@ -21,40 +21,7 @@ const DEFAULT_CONFIG: UltraCompactConfig = {
 	autoCompact: true,
 };
 
-/**
- * Format compaction result for display
- */
-function formatCompactionResult(result: CompactionResult): string {
-	const lines: string[] = [];
 
-	lines.push("=== Ultra-Compact Compaction Complete ===");
-	lines.push("");
-	lines.push("Summary:");
-	lines.push(`  Tokens before: ${result.tokensBefore.toLocaleString()}`);
-	lines.push(`  Tokens after: ~${result.tokensAfter.toLocaleString()}`);
-	lines.push(
-		`  Compression: ${((1 - result.compressionRatio) * 100).toFixed(1)}% reduction`,
-	);
-	lines.push("");
-
-	if (result.readFiles.length > 0 || result.modifiedFiles.length > 0) {
-		lines.push("File Operations:");
-		if (result.readFiles.length > 0) {
-			lines.push(`  Read: ${result.readFiles.length} files`);
-		}
-		if (result.modifiedFiles.length > 0) {
-			lines.push(`  Modified: ${result.modifiedFiles.length} files`);
-		}
-		lines.push("");
-	}
-
-	lines.push("Summary Content:");
-	lines.push("---");
-	lines.push(result.summary);
-	lines.push("---");
-
-	return lines.join("\n");
-}
 
 /**
  * Attempt to extract model name from Pi context.
@@ -81,54 +48,38 @@ function reconfigureEngineForCurrentModel(engine: UltraCompactEngine): void {
 
 /**
  * Handle /ultracompact command — manual compaction request.
+ * Triggers Pi's native compaction flow via ctx.compact().
+ * Our session_before_compact hook intercepts and applies ultra-compact logic.
  */
 function handleUltracompactCommand(
 	engine: UltraCompactEngine,
-	mergedConfig: UltraCompactConfig,
 ): (_args: any, ctx: any) => void {
 	return (_args: any, ctx: any) => {
-		if (!ctx.session) {
-			ctx.ui.notify("Session not available for compaction.", "error");
-			return;
-		}
-
 		// Reconfigure engine to current model before compaction
 		reconfigureEngineForCurrentModel(engine);
 
 		ctx.ui.notify("Starting ultra-compact compaction...", "info");
 
-		try {
-			const messages = ctx.session.messages || [];
-
-			if (messages.length === 0) {
-				ctx.ui.notify("No messages to compact.", "warning");
-				return;
-			}
-
-			const previousSummary = ctx.session.summary || undefined;
-			const result = engine.generateSummary(messages, previousSummary);
-
-			// Apply compaction via session API when available, fallback to direct mutation
-			if (typeof ctx.session.applyCompaction === "function") {
-				ctx.session.applyCompaction(result.summary);
-			} else {
-				ctx.session.summary = result.summary;
-				const keepPercentage = mergedConfig.keepPercentage ?? 0.3;
-				ctx.session.messages = messages.slice(
-					-Math.ceil(messages.length * keepPercentage),
+		// Use Pi's built-in compact() API with a marker so our
+		// session_before_compact hook applies ultra-compact logic
+		ctx.compact({
+			customInstructions: "ultracompact",
+			onComplete: () => {
+				ctx.ui.notify("Ultra-compact compaction complete!", "success");
+			},
+			onError: (error: Error) => {
+				ctx.ui.notify(
+					`Ultra-compact failed: ${error.message}`,
+					"error",
 				);
-			}
-
-			ctx.ui.notify(formatCompactionResult(result), "success");
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			ctx.ui.notify(`Ultra-compact failed: ${message}`, "error");
-		}
+			},
+		});
 	};
 }
 
 /**
  * Handle session_before_compact event — automatic compaction intercept.
+ * Also fired when the /ultracompact command calls ctx.compact().
  */
 function handleBeforeCompact(
 	engine: UltraCompactEngine,
@@ -137,13 +88,24 @@ function handleBeforeCompact(
 		// Reconfigure engine to current model before checking threshold
 		reconfigureEngineForCurrentModel(engine);
 
+		// Also capture model from ctx at runtime for maximum accuracy
+		if (ctx?.model?.id && ctx.model.id !== currentModel?.id) {
+			currentModel = {
+				id: ctx.model.id,
+				contextWindow: ctx.model.contextWindow,
+			};
+			engine.reconfigure(ctx.model.id);
+		}
+
 		const preparation = event?.preparation;
 		if (!preparation) {
 			return undefined;
 		}
 		const currentTokens = preparation.tokensBefore;
+		const isManual = event?.customInstructions === "ultracompact";
 
-		if (!engine.shouldCompact(currentTokens)) {
+		// Skip threshold check for manual /ultracompact command
+		if (!isManual && !engine.shouldCompact(currentTokens)) {
 			return undefined;
 		}
 
@@ -222,7 +184,7 @@ export default function piUltraCompact(
 	pi.registerCommand("ultracompact", {
 		description:
 			"Ultra-compact compaction with maximum compression while preserving critical context.",
-		handler: handleUltracompactCommand(engine, mergedConfig),
+		handler: handleUltracompactCommand(engine),
 	});
 
 	// Track model changes at runtime so compaction adapts when user switches models
