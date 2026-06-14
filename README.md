@@ -23,13 +23,15 @@ pi install pi-ultra-compact
 
 ## Quick Start
 
-After installation and restarting Pi:
+After installation and restarting Pi, use:
 
-```bash
-/ultracompact    # Manual compaction
+```
+/ultracompact
 ```
 
-Auto-compaction triggers when context exceeds 80% of your model's context window.
+This triggers manual ultra-compact compaction.
+
+Auto-compaction triggers automatically when context exceeds 80% of your model's context window.
 
 ## Supported Models
 
