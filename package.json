@@ -1,7 +1,7 @@
 {
   "name": "pi-ultra-compact",
-  "version": "0.2.0",
-  "description": "Ultra-compact compaction skill for Pi with maximum compression while preserving critical context",
+  "version": "0.3.0",
+  "description": "Advanced compaction extension and skill for Pi with automatic threshold-based compaction and critical context preservation",
   "keywords": [
     "pi-package",
     "compaction",
@@ -21,6 +21,7 @@
     "url": "https://github.com/ZachDreamZ/pi-ultra-compact/issues"
   },
   "pi": {
+    "extensions": ["./extensions"],
     "skills": ["./skills"]
   },
   "peerDependencies": {
