@@ -1,22 +1,57 @@
 # Ultra-Compact Compaction
 
+Advanced compaction skill for Pi with automatic threshold-based compaction and support for 200+ models.
+
 ## When to Use
 
-Use this skill when the session context is approaching limits and you need to compress conversation history while preserving critical information.
+Use this skill when:
+- Session context is approaching limits
+- You need to compress conversation history while preserving critical information
+- Manual compaction is needed via `/ultracompact`
+- Auto-compaction triggers at 80% of model's context window
+
+## Supported Models
+
+| Provider | Models | Context Window |
+|----------|--------|----------------|
+| **OpenAI** | GPT-5/5.1/5.2, GPT-4.1, GPT-4o, O3, O4-mini | 8K - 1M tokens |
+| **Anthropic** | Claude 4.5/4.0/3.7/3.5/3 | 200K tokens |
+| **Google** | Gemini 2.5/2.0/1.5, Gemma 3/2 | 32K - 2M tokens |
+| **DeepSeek** | V4 Pro, V3, V2.5, R1 | 64K - 1M tokens |
+| **Meta** | Llama 4, 3.3, 3.1, 3, 2 | 4K - 1M tokens |
+| **Mistral** | Medium 3.5, Large 3, Small 4, Codestral | 32K - 256K tokens |
+| **Qwen** | Qwen3, Qwen2.5, Qwen2 | 32K - 128K tokens |
+| **Microsoft** | Phi-4, Phi-3, Phi-2 | 2K - 32K tokens |
+| **xAI** | Grok 3, Grok 2 | 8K - 131K tokens |
 
 ## Procedure
 
-### 1. Identify Critical Elements
+### 1. Manual Compaction
 
-Before compaction, identify and preserve:
-- **GOAL**: The current objective being worked toward
-- **INSTRUCTIONS**: Key constraints and requirements
-- **DISCOVERIES**: Important findings, decisions, and non-obvious learnings
-- **ACCOMPLISHED**: What has been completed
-- **NEXT STEPS**: What needs to be done next
-- **RELEVANT FILES**: Important files and paths
+Use the `/ultracompact` command for manual compaction:
 
-### 2. Apply Compression Rules
+```
+/ultracompact
+```
+
+### 2. Auto-Compaction
+
+Auto-compaction triggers when context exceeds 80% of your model's context window:
+- Claude Opus: 160,000 tokens
+- GPT-5: 320,000 tokens
+- Gemini 2.5 Pro: 800,000 tokens
+- DeepSeek V4 Pro: 800,000 tokens
+
+### 3. Critical Information Extraction
+
+The skill automatically extracts and preserves:
+- **Goals**: Current objectives being worked toward
+- **Decisions**: Key choices and their reasoning
+- **Errors**: Problems encountered and solutions found
+- **File Paths**: Important files read or modified
+- **Next Steps**: What needs to be done next
+
+### 4. Compression Rules
 
 **Preserve (Never Remove):**
 - Active goals and acceptance criteria
@@ -37,7 +72,7 @@ Before compaction, identify and preserve:
 - Verbose explanations (keep the conclusion)
 - Repeated context
 
-### 3. Format Output
+### 5. Format Output
 
 ```markdown
 ## Session Summary
@@ -45,20 +80,26 @@ Before compaction, identify and preserve:
 ### GOAL
 [Current objective]
 
-### INSTRUCTIONS
-[Key constraints and requirements]
+### KEY DECISIONS
+[Important choices and reasoning]
 
-### DISCOVERIES
-[Important findings, decisions, learnings]
+### ERRORS & SOLUTIONS
+[Problems encountered and how they were solved]
 
-### ACCOMPLISHED
-[What has been completed]
+### FILE OPERATIONS
+Read:
+- path/to/file1.ts
+- path/to/file2.ts
+
+Modified:
+- path/to/changed.ts
 
 ### NEXT STEPS
-[What needs to be done]
+1. [Action item 1]
+2. [Action item 2]
 
-### RELEVANT FILES
-[Important files and paths]
+### CONTEXT
+[Other critical information needed to continue]
 ```
 
 ## Pitfalls
@@ -67,6 +108,7 @@ Before compaction, identify and preserve:
 - **Losing context**: Always preserve the current goal and next steps
 - **Breaking references**: Keep file paths and function names intact
 - **Forgetting decisions**: Always preserve the reasoning behind choices
+- **Wrong threshold**: Extension auto-detects model - don't manually set unless needed
 
 ## Verification
 
@@ -76,3 +118,15 @@ After compaction, verify:
 3. All critical file paths are preserved
 4. Key decisions and their reasoning are intact
 5. The session can continue seamlessly
+
+## Installation
+
+```bash
+pi install pi-ultra-compact
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `/ultracompact` | Trigger manual ultra-compact compaction |
