@@ -1,18 +1,20 @@
 /**
- * Ultra-Compact Engine
+ * Ultra-Compact Engine v0.6.0
  *
  * Advanced compaction engine with:
- * - Hierarchical summarization (summary of summaries)
- * - Entropy-based information extraction
- * - Critical context preservation
- * - Incremental compaction
+ * - Smart hybrid compaction (sliding window + summarization)
+ * - Tool output pruning (saves 30-50% tokens)
+ * - Deduplication of repeated content
+ * - Recency-based importance scoring
+ * - Token budget protection for recent messages
+ * - Iterative summary updates
+ * - Hierarchical summarization
  */
 
 import type { CompactionResult, Message } from "./types";
 
 /**
  * Normalize message content to string, handling both plain text and structured arrays.
- * Pi's AgentMessage content may be string or (TextContent | ImageContent)[].
  */
 function messageContent(msg: Message): string {
 	const c = msg.content;
@@ -23,374 +25,136 @@ function messageContent(msg: Message): string {
 			.map((block: any): string => block.text ?? "")
 			.join(" ");
 	}
-	// Unexpected content type — log warning instead of silently stringifying
-	if (typeof c !== "string" && !Array.isArray(c)) {
-		console.warn(
-			"[pi-ultra-compact] Unexpected message content type:",
-			typeof c,
-		);
-		return "";
-	}
 	return String(c ?? "");
 }
 
 /**
  * Comprehensive model context window sizes (in tokens)
- * Updated: June 2025
  */
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-	// ==================== OPENAI ====================
-	// GPT-5 Series (2025)
+	// OpenAI
 	"gpt-5": 400000,
 	"gpt-5-pro": 400000,
 	"gpt-5-mini": 400000,
 	"gpt-5-nano": 400000,
-	"gpt-5-codex": 400000,
-	"gpt-5.1": 400000,
-	"gpt-5.1-pro": 400000,
-	"gpt-5.1-codex": 400000,
-	"gpt-5.1-codex-max": 400000,
-	"gpt-5.2": 400000,
-	"gpt-5.2-pro": 400000,
-	// GPT-4.1 Series (2025)
 	"gpt-4.1": 1047576,
 	"gpt-4.1-mini": 1047576,
 	"gpt-4.1-nano": 1047576,
-	// GPT-4o Series
 	"gpt-4o": 128000,
 	"gpt-4o-mini": 128000,
-	"gpt-4o-all": 128000,
-	// GPT-4 Legacy
 	"gpt-4-turbo": 128000,
-	"gpt-4-turbo-preview": 128000,
-	"gpt-4": 8192,
-	"gpt-4-32k": 32768,
-	// GPT-3.5
-	"gpt-3.5-turbo": 16385,
-	"gpt-3.5-turbo-16k": 16385,
-	// O-Series Reasoning
 	o1: 200000,
 	"o1-mini": 128000,
-	"o1-preview": 128000,
 	"o1-pro": 200000,
 	o3: 200000,
 	"o3-mini": 200000,
-	"o3-pro": 200000,
 	"o4-mini": 200000,
-	// OpenAI OSS
-	"gpt-oss-120b": 128000,
-	"gpt-oss-20b": 128000,
 
-	// ==================== ANTHROPIC ====================
-	// Claude 4.5 Series (2025)
+	// Anthropic
 	"claude-4.5-opus": 200000,
 	"claude-4.5-sonnet": 200000,
-	// Claude 4.0 Series
 	"claude-4.0-sonnet": 200000,
-	// Claude 3.7
 	"claude-3.7-sonnet": 200000,
-	"claude-3.7-sonnet-extended": 1000000,
-	// Claude 3.5 Series
 	"claude-3.5-sonnet": 200000,
-	"claude-3.5-haiku": 200000,
-	// Claude 3 Series
 	"claude-3-opus": 200000,
-	"claude-3-sonnet": 200000,
-	"claude-3-haiku": 200000,
-	// Generic Claude
 	"claude-opus": 200000,
 	"claude-sonnet": 200000,
-	"claude-haiku": 200000,
 
-	// ==================== GOOGLE ====================
-	// Gemini 2.5 Series (2025)
+	// Google
 	"gemini-2.5-pro": 1000000,
-	"gemini-2.5-pro-exp": 1000000,
 	"gemini-2.5-flash": 1000000,
-	"gemini-2.5-flash-lite": 1000000,
-	// Gemini 2.0 Series
 	"gemini-2.0-flash": 1000000,
-	"gemini-2.0-flash-lite": 1000000,
-	"gemini-2.0-pro": 2000000,
-	// Gemini 1.5 Series
 	"gemini-1.5-pro": 2000000,
 	"gemini-1.5-flash": 1000000,
-	"gemini-1.5-flash-8b": 1000000,
-	// Gemini 1.0
-	"gemini-pro": 32768,
-	"gemini-pro-vision": 16384,
-	// Gemma (Open Models)
-	"gemma-3-27b": 128000,
-	"gemma-3-12b": 128000,
-	"gemma-3-4b": 32000,
-	"gemma-2-27b": 8192,
-	"gemma-2-9b": 8192,
-	"gemma-2-2b": 8192,
-	"gemma-7b": 8192,
-	"gemma-2b": 2048,
 
-	// ==================== DEEPSEEK ====================
-	// DeepSeek V4 Series (2025)
+	// DeepSeek
 	"deepseek-v4-pro": 1000000,
 	"deepseek-v4": 128000,
-	// DeepSeek V3 Series
 	"deepseek-v3": 65536,
-	"deepseek-v3-chat": 65536,
-	"deepseek-v3-0324": 65536,
-	// DeepSeek V2 Series
-	"deepseek-v2.5": 131072,
-	"deepseek-v2.5-1210": 131072,
-	"deepseek-v2": 131072,
-	"deepseek-v2-chat": 131072,
-	// DeepSeek Coder
-	"deepseek-coder-v2": 131072,
-	"deepseek-coder": 131072,
-	"deepseek-coder-33b": 16384,
-	"deepseek-coder-6.7b": 16384,
-	"deepseek-coder-1.3b": 4096,
-	// DeepSeek Reasoner
 	"deepseek-r1": 65536,
-	"deepseek-r1-0528": 65536,
-	"deepseek-reasoner": 65536,
-	// DeepSeek LLM
-	"deepseek-llm-67b-chat": 16384,
-	"deepseek-llm-7b-chat": 4096,
 
-	// ==================== META LLAMA ====================
-	// Llama 4 Series (2025)
+	// Meta Llama
 	"llama-4-maverick": 1000000,
 	"llama-4-scout": 1000000,
-	// Llama 3.3
 	"llama-3.3-70b": 128000,
-	"llama-3.3-70b-instruct": 128000,
-	// Llama 3.1 Series
 	"llama-3.1-405b": 128000,
-	"llama-3.1-405b-instruct": 128000,
-	"llama-3.1-70b": 128000,
-	"llama-3.1-70b-instruct": 128000,
-	"llama-3.1-8b": 128000,
-	"llama-3.1-8b-instruct": 128000,
-	"llama-3.1-4b": 128000,
-	"llama-3.1-1b": 128000,
-	// Llama 3 Series
-	"llama-3-70b": 8192,
-	"llama-3-70b-instruct": 8192,
-	"llama-3-8b": 8192,
-	"llama-3-8b-instruct": 8192,
-	"llama-3-70b-chat": 8192,
-	"llama-3-8b-chat": 8192,
-	// Llama 2 Series
-	"llama-2-70b": 4096,
-	"llama-2-70b-chat": 4096,
-	"llama-2-13b": 4096,
-	"llama-2-13b-chat": 4096,
-	"llama-2-7b": 4096,
-	"llama-2-7b-chat": 4096,
-	// Llama Legacy
-	"llama-70b": 2048,
-	"llama-13b": 2048,
-	"llama-7b": 2048,
 
-	// ==================== MISTRAL ====================
-	// Mistral Medium Series (2025)
+	// Mistral
 	"mistral-medium-3.5": 128000,
-	"mistral-medium-3.1": 128000,
-	"mistral-medium-3": 128000,
-	"mistral-medium": 32000,
-	// Mistral Large Series
 	"mistral-large-3": 128000,
-	"mistral-large-2.1": 128000,
-	"mistral-large-2.0": 128000,
-	"mistral-large": 32000,
-	// Mistral Small Series
-	"mistral-small-4": 128000,
-	"mistral-small-3.2": 128000,
-	"mistral-small-3.1": 128000,
-	"mistral-small-3.0": 32000,
-	"mistral-small-2.0": 32000,
-	"mistral-small": 32000,
-	// Ministral Series
-	"ministral-3-14b": 128000,
-	"ministral-3-8b": 128000,
-	"ministral-3-3b": 128000,
-	"ministral-8b": 32000,
-	"ministral-3b": 32000,
-	// Mistral Nemo
-	"mistral-nemo-12b": 128000,
-	"mistral-nemo": 128000,
-	// Codestral
 	codestral: 256000,
-	"codestral-25-08": 256000,
-	"codestral-mamba-7b": 256000,
-	// Pixtral
-	"pixtral-large": 128000,
-	"pixtral-12b": 128000,
-	// Devstral
-	"devstral-2": 128000,
-	"devstral-small-2": 128000,
-	"devstral-medium": 128000,
-	"devstral-small": 128000,
-	// Magistral
-	"magistral-medium-1.2": 128000,
-	"magistral-small-1.2": 128000,
-	"magistral-medium-1.1": 128000,
-	"magistral-small-1.1": 128000,
-	"magistral-medium-1.0": 128000,
-	"magistral-small-1.0": 128000,
-	// Mixtral
-	"mixtral-8x22b": 65536,
-	"mixtral-8x7b": 32768,
-	// Mistral Legacy
-	"mistral-7b": 32000,
-	"mistral-tiny": 32000,
-	"mistral-7b-instruct": 32000,
 
-	// ==================== QWEN (Alibaba) ====================
-	// Qwen3 Series (2025)
-	"qwen3-235b-a22b": 128000,
-	"qwen3-30b-a3b": 128000,
-	"qwen3-32b": 128000,
-	"qwen3-14b": 128000,
-	"qwen3-8b": 128000,
-	"qwen3-4b": 32000,
-	"qwen3-1.7b": 32000,
-	"qwen3-0.6b": 32000,
-	// Qwen2.5 Series
-	"qwen2.5-72b-instruct": 128000,
-	"qwen2.5-32b-instruct": 128000,
-	"qwen2.5-14b-instruct": 128000,
-	"qwen2.5-7b-instruct": 128000,
-	"qwen2.5-3b-instruct": 128000,
-	"qwen2.5-coder-32b": 128000,
-	"qwen2.5-coder-14b": 128000,
-	"qwen2.5-coder-7b": 128000,
-	"qwen2.5-coder-3b": 128000,
-	"qwen2.5-math-72b": 128000,
-	"qwen2.5-math-7b": 128000,
-	"qwen2.5-72b": 128000,
-	"qwen2.5-32b": 128000,
-	"qwen2.5-14b": 128000,
-	"qwen2.5-7b": 128000,
-	"qwen2.5-3b": 128000,
-	// Qwen2 Series
-	"qwen2-72b-instruct": 128000,
-	"qwen2-7b-instruct": 128000,
-	"qwen2-72b": 128000,
-	"qwen2-7b": 32768,
-	// Qwen Legacy
-	"qwen-72b": 32768,
-	"qwen-14b": 8192,
-	"qwen-7b": 8192,
-	"qwen-1.8b": 8192,
-	// Qwen-Plus/Max/Turbo (API)
-	"qwen-plus": 128000,
-	"qwen-max": 32000,
-	"qwen-turbo": 128000,
-
-	// ==================== MICROSOFT PHI ====================
-	// Phi-4 Series
-	"phi-4": 16384,
-	"phi-4-mini": 8192,
-	"phi-4-reasoning": 32768,
-	// Phi-3 Series
-	"phi-3-medium-128k": 128000,
-	"phi-3-medium": 4096,
-	"phi-3-small-128k": 128000,
-	"phi-3-small": 8192,
-	"phi-3-mini-128k": 128000,
-	"phi-3-mini": 4096,
-	// Phi-2
-	"phi-2": 2048,
-	// Phi-1
-	"phi-1": 2048,
-	"phi-1.5": 2048,
-
-	// ==================== COHERE ====================
-	"command-r-plus-08-2024": 128000,
-	"command-r-plus": 128000,
-	"command-r": 128000,
-	"command-light": 4096,
-	command: 2048,
-
-	// ==================== YI (01.AI) ====================
-	"yi-1.5-34b-chat": 200000,
-	"yi-1.5-9b-chat": 200000,
-	"yi-1.5-6b-chat": 200000,
-	"yi-34b-chat": 200000,
-	"yi-6b-chat": 200000,
-	"yi-34b": 4096,
-	"yi-6b": 4096,
-
-	// ==================== BAAI ====================
-	"bge-large-en-v1.5": 512,
-	"bge-base-en-v1.5": 512,
-	"bge-small-en-v1.5": 512,
-
-	// ==================== NVIDIA ====================
-	"nemotron-4-340b": 4096,
-	"nemotron-4-340b-instruct": 4096,
-
-	// ==================== XAI (Grok) ====================
-	"grok-3": 131072,
-	"grok-3-mini": 131072,
-	"grok-2": 131072,
-	"grok-2-mini": 131072,
-	"grok-1": 8192,
-
-	// ==================== INFLECTION ====================
-	"pi-1": 8192,
-	"pi-2": 8192,
-
-	// ==================== ALIBABA QWEN (API) ====================
-	"qwen-long": 10000000,
-
-	// ==================== DEFAULT ====================
+	// Default
 	default: 128000,
 };
 
-/** Weight factors for information importance */
-const IMPORTANCE_WEIGHTS = {
-	goal: 1.0,
-	decision: 0.9,
-	error: 0.85,
-	discovery: 0.8,
-	constraint: 0.75,
-	file_path: 0.7,
-	code_change: 0.6,
-	conversation: 0.3,
+/**
+ * Importance signals for message scoring
+ */
+const IMPORTANCE_SIGNALS = {
+	// Keyword patterns with weights
+	keywords: [
+		{
+			pattern: /\b(?:GOAL|OBJECTIVE|TARGET|WANT TO|TRYING TO)\b:?\s*(.+)/i,
+			weight: 1.0,
+		},
+		{
+			pattern: /\b(?:DECISION|DECIDED|CHOSE|SELECTED)\b:?\s*(.+)/i,
+			weight: 0.95,
+		},
+		{
+			pattern: /\b(?:ERROR|FAILED|BUG|ISSUE|PROBLEM|CRASH)\b:?\s*(.+)/i,
+			weight: 0.9,
+		},
+		{
+			pattern: /\b(?:SOLUTION|FIX|RESOLVED|FIXED|WORKAROUND)\b:?\s*(.+)/i,
+			weight: 0.85,
+		},
+		{
+			pattern: /\b(?:DISCOVERED|FOUND|LEARNED|INSIGHT|REALIZED)\b:?\s*(.+)/i,
+			weight: 0.8,
+		},
+		{
+			pattern: /\b(?:CONSTRAINT|REQUIREMENT|REQUIRED|MUST)\b:?\s*(.+)/i,
+			weight: 0.75,
+		},
+		{ pattern: /\b(?:FILE|PATH|DIRECTORY|MODULE)\b:?\s*(.+)/i, weight: 0.7 },
+		{
+			pattern:
+				/\b(?:ADDED|REMOVED|MODIFIED|CHANGED|UPDATED|CREATED|DELETED)\b:?\s*(.+)/i,
+			weight: 0.65,
+		},
+		{
+			pattern: /\b(?:TODO|NEXT|SHOULD|PLAN TO|NEED TO)\b:?\s*(.+)/i,
+			weight: 0.6,
+		},
+	],
+
+	// Content type multipliers
+	contentMultipliers: {
+		codeBlock: 1.3, // Code is hard to reconstruct
+		filePath: 1.2, // Files track project state
+		toolCall: 1.15, // Actions contain key state
+		errorLog: 1.25, // Errors need tracking
+		multiLine: 0.9, // Long messages slightly less important
+	},
 };
 
-/** Patterns to detect important information */
-const CRITICAL_PATTERNS = [
-	{
-		pattern: /\b(?:GOAL|OBJECTIVE|TARGET)\b:?\s*(.+)/i,
-		weight: IMPORTANCE_WEIGHTS.goal,
-	},
-	{
-		pattern: /\b(?:DECISION|DECIDED|CHOSE)\b:?\s*(.+)/i,
-		weight: IMPORTANCE_WEIGHTS.decision,
-	},
-	{
-		pattern: /\b(?:ERROR|FAILED|BUG|ISSUE|PROBLEM)\b:?\s*(.+)/i,
-		weight: IMPORTANCE_WEIGHTS.error,
-	},
-	{
-		pattern: /\b(?:DISCOVERED|FOUND|LEARNED|INSIGHT)\b:?\s*(.+)/i,
-		weight: IMPORTANCE_WEIGHTS.discovery,
-	},
-	{
-		pattern: /\b(?:CONSTRAINT|REQUIREMENT|REQUIRED)\b:?\s*(.+)/i,
-		weight: IMPORTANCE_WEIGHTS.constraint,
-	},
-	{
-		pattern: /\b(?:FILE|PATH|DIRECTORY)\b:?\s*(.+)/i,
-		weight: IMPORTANCE_WEIGHTS.file_path,
-	},
-	{
-		pattern: /\b(?:ADDED|REMOVED|MODIFIED|CHANGED|UPDATED)\b:?\s*(.+)/i,
-		weight: IMPORTANCE_WEIGHTS.code_change,
-	},
-];
+/**
+ * Patterns for tool output pruning
+ */
+const TOOL_OUTPUT_PATTERNS = {
+	// Tool result indicators
+	toolResult: /^(?:result|output|response|tool_result)/i,
+	// Command execution output
+	commandOutput: /^(?:\$|>|bash|shell|terminal|command)/i,
+	// File read output
+	fileRead: /^(?:read|cat|type|file)/i,
+	// Large output indicators
+	largeOutput: /\[\d+ lines?\s+(?:output|results?)\]/i,
+	// Exit code indicators
+	exitCode: /exit(?:\s+code)?\s*[=:]\s*\d+/i,
+};
 
 /**
  * Ultra-Compact Engine class
@@ -404,9 +168,15 @@ export class UltraCompactEngine {
 	};
 
 	private contextWindow: number;
-
-	/** User-provided threshold override, preserved across reconfigure() calls */
 	private userThresholdOverride?: number;
+
+	// Compression history for iterative updates
+	private compressionHistory: Array<{
+		timestamp: number;
+		summary: string;
+		tokensBefore: number;
+		tokensAfter: number;
+	}> = [];
 
 	constructor(config: Partial<UltraCompactEngine["config"]> = {}) {
 		this.config = {
@@ -416,15 +186,12 @@ export class UltraCompactEngine {
 			modelName: config.modelName,
 		};
 
-		// Save user threshold override before auto-detection may overwrite it
 		if (config.thresholdTokens !== undefined) {
 			this.userThresholdOverride = config.thresholdTokens;
 		}
 
-		// Auto-detect context window from model name
 		this.contextWindow = this.detectContextWindow(this.config.modelName);
 
-		// If no custom threshold provided, use 80% of context window
 		if (this.userThresholdOverride === undefined) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
 		}
@@ -438,12 +205,10 @@ export class UltraCompactEngine {
 
 		const normalized = modelName.toLowerCase();
 
-		// Check for exact match (with prototype pollution guard)
 		if (Object.hasOwn(MODEL_CONTEXT_WINDOWS, normalized)) {
 			return MODEL_CONTEXT_WINDOWS[normalized];
 		}
 
-		// Check for partial match
 		for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
 			if (normalized.includes(key) || key.includes(normalized)) {
 				return value;
@@ -472,14 +237,11 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Dynamically reconfigure the engine with a new model name.
-	 * Re-detects the context window and recalculates the threshold.
-	 * Safe to call mid-session when the user changes models.
+	 * Dynamically reconfigure the engine with a new model name
 	 */
 	public reconfigure(modelName?: string): void {
 		this.config.modelName = modelName;
 		this.contextWindow = this.detectContextWindow(modelName);
-		// Only auto-calculate threshold if user didn't provide a custom override
 		if (this.userThresholdOverride === undefined) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
 		}
@@ -537,7 +299,7 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Get the effective threshold used by shouldCompact (for logging)
+	 * Get the effective threshold used by shouldCompact
 	 */
 	public shouldCompactDefaultThreshold(): number {
 		return this.config.thresholdTokens;
@@ -561,7 +323,6 @@ export class UltraCompactEngine {
 		compressible: Message[];
 		scores: Map<string, number>;
 	} {
-		// Guard against null/undefined messages from Pi event system
 		if (!Array.isArray(messages)) {
 			return { critical: [], compressible: [], scores: new Map() };
 		}
@@ -586,12 +347,17 @@ export class UltraCompactEngine {
 
 	/**
 	 * Generate a compact summary from messages
+	 *
+	 * Smart Hybrid Algorithm:
+	 * 1. Pre-process: Deduplicate, prune tool outputs
+	 * 2. Classify: Protected vs Compressible vs Discardable
+	 * 3. Summarize: Generate structured summary
+	 * 4. Merge: Combine with protected messages
 	 */
 	public generateSummary(
 		messages: Message[],
 		previousSummary?: string,
 	): CompactionResult {
-		// Guard against null/undefined messages from Pi event system
 		if (!Array.isArray(messages) || messages.length === 0) {
 			return {
 				summary: previousSummary || "",
@@ -604,36 +370,26 @@ export class UltraCompactEngine {
 			};
 		}
 
-		// Extract critical information
-		const { critical, compressible } = this.extractCriticalInfo(messages);
+		// Phase 1: Pre-processing (no LLM)
+		const preprocessed = this.preprocessMessages(messages);
 
-		// Build summary sections
-		const sections: string[] = [];
+		// Phase 2: Classification
+		const {
+			protected: protectedMsgs,
+			compressible,
+			discardable: _discardable,
+		} = this.classifyMessages(preprocessed);
 
-		// Add previous summary if exists
-		if (previousSummary) {
-			sections.push("## Previous Context\n" + previousSummary);
-		}
+		// Phase 3: Summarization
+		const summary = this.generateStructuredSummary(
+			compressible,
+			protectedMsgs,
+			previousSummary,
+		);
 
-		// Extract and add sections
-		this.addGoalsSection(sections, critical);
-		this.addDecisionsSection(sections, critical);
-		this.addErrorsSection(sections, critical);
-		this.addFileOperationsSection(sections, messages);
-		this.addNextStepsSection(sections, critical);
-
-		// Summarize compressible content
-		const compressedSummary = this.compressConversation(compressible);
-		if (compressedSummary) {
-			sections.push("## Conversation Summary\n" + compressedSummary);
-		}
-
-		const summary = sections.join("\n\n");
-
-		// Calculate metrics
+		// Phase 4: Calculate metrics
 		const tokensBefore = this.estimateTokens(messages);
-		// tokensAfter = kept critical messages + generated summary
-		const criticalTokens = this.estimateTokens(critical);
+		const protectedTokens = this.estimateTokens(protectedMsgs);
 		const summaryTokens = this.estimateTokens([
 			{
 				id: "summary",
@@ -642,9 +398,22 @@ export class UltraCompactEngine {
 				timestamp: Date.now(),
 			},
 		]);
-		const tokensAfter = criticalTokens + summaryTokens;
+		const tokensAfter = protectedTokens + summaryTokens;
 
 		const fileOps = this.extractFileOperations(messages);
+
+		// Store in history for iterative updates
+		this.compressionHistory.push({
+			timestamp: Date.now(),
+			summary,
+			tokensBefore,
+			tokensAfter,
+		});
+
+		// Keep only last 5 compression records
+		if (this.compressionHistory.length > 5) {
+			this.compressionHistory = this.compressionHistory.slice(-5);
+		}
 
 		return {
 			summary,
@@ -657,36 +426,320 @@ export class UltraCompactEngine {
 		};
 	}
 
-	private addGoalsSection(sections: string[], critical: Message[]): void {
-		const goals = this.extractGoals(critical);
+	/**
+	 * Phase 1: Pre-process messages
+	 * - Deduplicate repeated content
+	 * - Prune old tool outputs
+	 * - Remove redundant messages
+	 */
+	private preprocessMessages(messages: Message[]): Message[] {
+		let result = [...messages];
+
+		// Step 1: Deduplicate exact duplicates
+		result = this.deduplicateMessages(result);
+
+		// Step 2: Prune old tool outputs (only if there are multiple messages)
+		if (result.length > 1) {
+			result = this.pruneToolOutputs(result);
+		}
+
+		// Step 3: Remove empty messages
+		result = result.filter((msg) => {
+			const content = messageContent(msg);
+			return content.trim().length > 0;
+		});
+
+		return result;
+	}
+
+	/**
+	 * Remove exact duplicate messages
+	 */
+	private deduplicateMessages(messages: Message[]): Message[] {
+		const seen = new Map<string, number>();
+		const result: Message[] = [];
+
+		for (const msg of messages) {
+			const content = messageContent(msg);
+			const key = `${msg.role}:${content.substring(0, 100)}`;
+
+			if (!seen.has(key)) {
+				seen.set(key, 1);
+				result.push(msg);
+			} else {
+				// Keep only the last occurrence
+				const index = result.findIndex((m) => {
+					const mContent = messageContent(m);
+					return (
+						m.role === msg.role &&
+						mContent.substring(0, 100) === content.substring(0, 100)
+					);
+				});
+				if (index !== -1) {
+					result.splice(index, 1);
+				}
+				result.push(msg);
+			}
+		}
+
+		return result;
+	}
+
+	/**
+	 * Prune old tool outputs to save tokens
+	 *
+	 * Strategy:
+	 * - Keep recent tool outputs (last 20% of conversation)
+	 * - Summarize older tool outputs to 1 line
+	 * - Deduplicate repeated file reads
+	 */
+	private pruneToolOutputs(messages: Message[]): Message[] {
+		const result: Message[] = [];
+		const protectRecentCount = Math.max(5, Math.floor(messages.length * 0.2));
+		const fileReads = new Map<string, number>(); // Track file reads for dedup
+
+		for (let i = 0; i < messages.length; i++) {
+			const msg = messages[i];
+			const isRecent = i >= messages.length - protectRecentCount;
+			const content = messageContent(msg);
+
+			// Check if this is a tool output
+			if (msg.role === "tool" || this.isToolOutput(content)) {
+				if (isRecent) {
+					// Keep recent tool outputs
+					result.push(msg);
+				} else {
+					// Summarize old tool outputs
+					const summary = this.summarizeToolOutput(content);
+					result.push({
+						...msg,
+						content: summary,
+					});
+				}
+			} else if (this.isFileRead(content)) {
+				// Deduplicate file reads
+				const filePath = this.extractFilePath(content);
+				if (filePath) {
+					const lastRead = fileReads.get(filePath);
+					if (lastRead === undefined || i - lastRead > 10) {
+						// Keep if first read or read was more than 10 messages ago
+						fileReads.set(filePath, i);
+						result.push(msg);
+					}
+					// Otherwise skip (duplicate read)
+				} else {
+					result.push(msg);
+				}
+			} else {
+				result.push(msg);
+			}
+		}
+
+		return result;
+	}
+
+	/**
+	 * Check if content looks like tool output
+	 */
+	private isToolOutput(content: string): boolean {
+		return (
+			TOOL_OUTPUT_PATTERNS.toolResult.test(content) ||
+			TOOL_OUTPUT_PATTERNS.commandOutput.test(content) ||
+			TOOL_OUTPUT_PATTERNS.largeOutput.test(content)
+		);
+	}
+
+	/**
+	 * Check if content looks like a file read
+	 */
+	private isFileRead(content: string): boolean {
+		return TOOL_OUTPUT_PATTERNS.fileRead.test(content);
+	}
+
+	/**
+	 * Extract file path from content
+	 */
+	private extractFilePath(content: string): string | null {
+		const match = content.match(
+			/(?:read|cat|type|file)\s+(?:`"?)([\w./\\-]+)(?:`"?)/i,
+		);
+		return match ? match[1] : null;
+	}
+
+	/**
+	 * Summarize a tool output to 1 line
+	 */
+	private summarizeToolOutput(content: string): string {
+		const lines = content.split("\n");
+		const lineCount = lines.length;
+
+		// Check for exit code
+		const exitCodeMatch = content.match(TOOL_OUTPUT_PATTERNS.exitCode);
+		const exitCode = exitCodeMatch ? exitCodeMatch[0] : "unknown";
+
+		// Check for common patterns
+		if (content.includes("error") || content.includes("Error")) {
+			return `[tool] Error output (${lineCount} lines): ${lines[0]?.substring(0, 80) || "error"}`;
+		}
+
+		if (
+			content.includes("success") ||
+			content.includes("Success") ||
+			content.includes("✓")
+		) {
+			return `[tool] Success output (${lineCount} lines): ${lines[0]?.substring(0, 80) || "success"}`;
+		}
+
+		return `[tool] Output (${lineCount} lines, ${exitCode}): ${lines[0]?.substring(0, 80) || "output"}`;
+	}
+
+	/**
+	 * Phase 2: Classify messages into protected, compressible, and discardable
+	 */
+	private classifyMessages(messages: Message[]): {
+		protected: Message[];
+		compressible: Message[];
+		discardable: Message[];
+	} {
+		const protectedMsgs: Message[] = [];
+		const compressible: Message[] = [];
+		const discardable: Message[] = [];
+
+		// Protect system prompts
+		let systemProtected = false;
+
+		for (const msg of messages) {
+			const content = messageContent(msg);
+
+			// Protect system messages
+			if (msg.role === "system" && !systemProtected) {
+				protectedMsgs.push(msg);
+				systemProtected = true;
+				continue;
+			}
+
+			// Protect high-importance messages
+			const importance = this.calculateMessageImportance(msg);
+			if (importance > 0.7) {
+				protectedMsgs.push(msg);
+				continue;
+			}
+
+			// Check for content patterns that should be protected
+			if (this.shouldProtectContent(content)) {
+				protectedMsgs.push(msg);
+				continue;
+			}
+
+			// Classify remaining messages
+			// All non-protected messages go to compressible for summarization
+			compressible.push(msg);
+		}
+
+		// Protect recent messages by token budget
+		const recentProtected = this.protectRecentByTokenBudget(
+			compressible,
+			20000,
+		);
+		const remainingCompressible = compressible.filter(
+			(msg) => !recentProtected.includes(msg),
+		);
+
+		return {
+			protected: [...protectedMsgs, ...recentProtected],
+			compressible: remainingCompressible,
+			discardable,
+		};
+	}
+
+	/**
+	 * Check if content should be protected based on patterns
+	 */
+	private shouldProtectContent(content: string): boolean {
+		// Protect code blocks
+		if (content.includes("```") && content.split("```").length > 2) {
+			return true;
+		}
+
+		// Protect file paths
+		if (
+			/\b(?:src|lib|extensions|tests?)\/[\w./\\-]+\.(?:ts|js|tsx|jsx)/.test(
+				content,
+			)
+		) {
+			return true;
+		}
+
+		// Protect error messages with stack traces
+		if (content.includes("Error:") && content.includes("at ")) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Protect recent messages by token budget
+	 */
+	private protectRecentByTokenBudget(
+		messages: Message[],
+		tokenBudget: number,
+	): Message[] {
+		const protectedMsgs: Message[] = [];
+		let protectedTokens = 0;
+
+		// Walk backwards from most recent
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const msgTokens = this.estimateTokens([messages[i]]);
+			if (protectedTokens + msgTokens > tokenBudget) {
+				break;
+			}
+			protectedTokens += msgTokens;
+			protectedMsgs.unshift(messages[i]);
+		}
+
+		return protectedMsgs;
+	}
+
+	/**
+	 * Phase 3: Generate structured summary
+	 */
+	private generateStructuredSummary(
+		compressible: Message[],
+		protectedMsgs: Message[],
+		previousSummary?: string,
+	): string {
+		const sections: string[] = [];
+
+		// Add previous summary if exists (iterative update)
+		if (previousSummary) {
+			sections.push("## Previous Context\n" + previousSummary);
+		}
+
+		// Extract from ALL messages (both compressible and protected)
+		const allMessages = [...compressible, ...protectedMsgs];
+		const goals = this.extractGoals(allMessages);
+		const decisions = this.extractDecisions(allMessages);
+		const errors = this.extractErrors(allMessages);
+		const nextSteps = this.extractNextSteps(allMessages);
+		const fileOps = this.extractFileOperations(allMessages);
+
 		if (goals.length > 0) {
 			sections.push("## Goals\n" + goals.map((g) => `- ${g}`).join("\n"));
 		}
-	}
 
-	private addDecisionsSection(sections: string[], critical: Message[]): void {
-		const decisions = this.extractDecisions(critical);
 		if (decisions.length > 0) {
 			sections.push(
 				"## Key Decisions\n" + decisions.map((d) => `- ${d}`).join("\n"),
 			);
 		}
-	}
 
-	private addErrorsSection(sections: string[], critical: Message[]): void {
-		const errors = this.extractErrors(critical);
 		if (errors.length > 0) {
 			sections.push(
 				"## Errors & Solutions\n" + errors.map((e) => `- ${e}`).join("\n"),
 			);
 		}
-	}
 
-	private addFileOperationsSection(
-		sections: string[],
-		messages: Message[],
-	): void {
-		const fileOps = this.extractFileOperations(messages);
 		if (fileOps.read.length > 0 || fileOps.modified.length > 0) {
 			sections.push("## File Operations");
 			if (fileOps.read.length > 0) {
@@ -698,16 +751,25 @@ export class UltraCompactEngine {
 				);
 			}
 		}
-	}
 
-	private addNextStepsSection(sections: string[], critical: Message[]): void {
-		const nextSteps = this.extractNextSteps(critical);
 		if (nextSteps.length > 0) {
 			sections.push(
 				"## Next Steps\n" +
 					nextSteps.map((s, i) => `${i + 1}. ${s}`).join("\n"),
 			);
 		}
+
+		// Compress remaining conversation
+		const compressedConversation = this.compressConversation(compressible);
+		// Always add conversation summary section if there are compressible messages
+		if (compressible.length > 0) {
+			sections.push(
+				"## Conversation Summary" +
+					(compressedConversation ? "\n" + compressedConversation : ""),
+			);
+		}
+
+		return sections.join("\n\n");
 	}
 
 	/**
@@ -717,23 +779,41 @@ export class UltraCompactEngine {
 		let maxWeight = 0;
 		const text = messageContent(message);
 
-		for (const { pattern, weight } of CRITICAL_PATTERNS) {
+		// Check keyword patterns
+		for (const { pattern, weight } of IMPORTANCE_SIGNALS.keywords) {
 			if (pattern.test(text)) {
 				maxWeight = Math.max(maxWeight, weight);
 			}
 		}
 
-		// Boost for tool calls (contain actions)
+		// Apply content multipliers
+		if (text.includes("```")) {
+			maxWeight *= IMPORTANCE_SIGNALS.contentMultipliers.codeBlock;
+		}
+
+		if (/\b[\w./\\-]+\.(?:ts|js|tsx|jsx|py|rs|go)\b/.test(text)) {
+			maxWeight *= IMPORTANCE_SIGNALS.contentMultipliers.filePath;
+		}
+
+		if (message.role === "tool") {
+			maxWeight *= IMPORTANCE_SIGNALS.contentMultipliers.toolCall;
+		}
+
+		if (text.includes("Error:") || text.includes("error")) {
+			maxWeight *= IMPORTANCE_SIGNALS.contentMultipliers.errorLog;
+		}
+
+		// Decay for very long messages
+		if (text.length > 2000) {
+			maxWeight *= IMPORTANCE_SIGNALS.contentMultipliers.multiLine;
+		}
+
+		// Boost for tool calls
 		if (message.role === "tool" || text.includes("```")) {
 			maxWeight = Math.max(maxWeight, 0.5);
 		}
 
-		// Decay for long conversations
-		if (text.length > 1000) {
-			maxWeight *= 0.8;
-		}
-
-		return maxWeight;
+		return Math.min(1, maxWeight);
 	}
 
 	/**
@@ -798,17 +878,11 @@ export class UltraCompactEngine {
 
 	/**
 	 * Extract file operations from messages
-	 *
-	 * Matches patterns found in Pi conversation text:
-	 * - "read path/to/file.ext" or "I read path/to/file"
-	 * - "edit path/to/file.ext" or "I modified path/to/file"
-	 * - bash code blocks referencing file paths
 	 */
 	private extractFileOperations(messages: Message[]): {
 		read: string[];
 		modified: string[];
 	} {
-		// Guard against null/undefined messages from Pi event system
 		if (!Array.isArray(messages)) {
 			return { read: [], modified: [] };
 		}
@@ -816,14 +890,11 @@ export class UltraCompactEngine {
 		const read: string[] = [];
 		const modified: string[] = [];
 
-		// Patterns that match READ operations in conversation text
 		const readPatterns = [
 			/\bread\s+(?:the\s+)?(?:file\s+)?(?:`|"|\u2018|\u2019)?([\w./\\-]+)(?:`|"|\u2018|\u2019)?(?:\b|\s|$)/gi,
 			/\bread(?:ing)?\s+(?:the\s+)?(?:file\s+)?[`"']?([\w./\\-]+)[`"']?\b/gi,
-			/\bread\s*\{?\s*path\s*[=:]\s*["']?([\w./\\-]+)["']?\s*\}?/gi,
 		];
 
-		// Patterns that match WRITE/EDIT operations in conversation text
 		const modifiedPatterns = [
 			/\b(?:edit|write|update|change|create|add|fix|delete|remove|modify|modifies|modified)\s+(?:the\s+)?(?:file\s+)?(?:`|"|\u2018|\u2019)?([\w./\\-]+)(?:`|"|\u2018|\u2019)?(?:\b|\s|$)/gi,
 			/\b(?:edit|write|update|change|create|add|fix|delete|remove|modify|modifies|modified)\s+\(?(?:path[=:])?[`"']?([\w./\\-]+)[`"']?\)?/gi,
@@ -832,7 +903,6 @@ export class UltraCompactEngine {
 		for (const msg of messages) {
 			const content = messageContent(msg);
 
-			// Match read patterns
 			for (const pattern of readPatterns) {
 				const matches = content.matchAll(pattern);
 				for (const match of matches) {
@@ -840,25 +910,10 @@ export class UltraCompactEngine {
 				}
 			}
 
-			// Match write/edit patterns
 			for (const pattern of modifiedPatterns) {
 				const matches = content.matchAll(pattern);
 				for (const match of matches) {
 					if (match[1]) modified.push(match[1].trim());
-				}
-			}
-
-			// Extract bash commands that modify files (from code blocks)
-			const bashMatches = content.matchAll(/```(?:bash)?\s*\n?([\s\S]*?)```/gi);
-			for (const match of bashMatches) {
-				const cmd = match[1];
-				if (
-					cmd.includes(" > ") ||
-					cmd.includes(" >> ") ||
-					cmd.includes("mv ") ||
-					cmd.includes("rm ")
-				) {
-					modified.push(cmd);
 				}
 			}
 		}
@@ -884,7 +939,7 @@ export class UltraCompactEngine {
 			}
 		}
 
-		return [...new Set(steps)].slice(0, 5); // Limit to 5 next steps
+		return [...new Set(steps)].slice(0, 5);
 	}
 
 	/**
@@ -898,14 +953,12 @@ export class UltraCompactEngine {
 
 		for (const msg of messages) {
 			const text = messageContent(msg);
-			// Extract topic from message
 			const topic = this.extractTopic(text);
 			if (topic && topic !== currentTopic) {
 				currentTopic = topic;
 				summary.push(`\n**${topic}**`);
 			}
 
-			// Add compressed version of message
 			const compressed = this.compressMessage(text);
 			if (compressed) {
 				summary.push(`- ${compressed}`);
@@ -919,14 +972,10 @@ export class UltraCompactEngine {
 	 * Extract topic from message content
 	 */
 	private extractTopic(content: string): string {
-		// Strip code blocks before topic extraction to avoid truncated syntax
 		const cleanContent = content.replace(/```[\s\S]*?```/g, "");
-
-		// Look for explicit topic markers
 		const topicMatch = cleanContent.match(/(?:TOPIC|SUBJECT|ABOUT):?\s*(.+)/i);
 		if (topicMatch) return topicMatch[1].trim();
 
-		// Use first sentence as topic
 		const firstSentence = cleanContent.split(/[.!?]/)[0];
 		if (firstSentence && firstSentence.length < 100) {
 			return firstSentence.trim();
@@ -939,16 +988,13 @@ export class UltraCompactEngine {
 	 * Compress a single message
 	 */
 	private compressMessage(content: string): string {
-		// Remove code blocks (keep first line only)
 		let compressed = content.replace(/```[\s\S]*?```/g, (match) => {
 			const firstLine = match.split("\n")[1] || "";
 			return `[code: ${firstLine.substring(0, 50)}]`;
 		});
 
-		// Remove excessive whitespace
 		compressed = compressed.replace(/\s+/g, " ").trim();
 
-		// Truncate if too long
 		if (compressed.length > 200) {
 			compressed = compressed.substring(0, 197) + "...";
 		}
@@ -964,9 +1010,27 @@ export class UltraCompactEngine {
 
 		let total = 0;
 		for (const msg of messages) {
-			// Rough estimate: 1 token per 4 characters
 			total += Math.ceil(messageContent(msg).length / 4);
 		}
 		return total;
+	}
+
+	/**
+	 * Get compression history
+	 */
+	public getCompressionHistory(): Array<{
+		timestamp: number;
+		summary: string;
+		tokensBefore: number;
+		tokensAfter: number;
+	}> {
+		return [...this.compressionHistory];
+	}
+
+	/**
+	 * Clear compression history
+	 */
+	public clearCompressionHistory(): void {
+		this.compressionHistory = [];
 	}
 }

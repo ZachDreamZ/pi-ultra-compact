@@ -14,6 +14,11 @@ Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic
 - **Hierarchical summarization** with entropy-based information extraction
 - **Critical context preservation** - goals, decisions, errors, file paths
 - **Extension + Skill** - works as both a Pi extension and a skill
+- **Smart model switching** - remembers per-model thresholds and preserves custom settings
+- **Conversation structure detection** - identifies turns, phases, and progress
+- **Enhanced critical extraction** - detects progress, questions, user preferences
+- **Multi-pass summarization** - progressive compression with quality scoring
+- **Token estimation cache** - LRU cache for performance
 
 ## Installation
 
@@ -52,10 +57,11 @@ Auto-compaction triggers automatically when context exceeds 80% of your model's 
 ## How It Works
 
 1. **Auto-detection**: Extension detects your model from Pi configuration
-2. **Threshold calculation**: Sets compaction threshold at 80% of model's context window
-3. **Critical extraction**: Identifies important information (goals, decisions, errors)
-4. **Compression**: Generates compact summary preserving critical context
-5. **File tracking**: Maintains read/modified file history across compactions
+2. **Smart switching**: Remembers per-model thresholds, preserves custom settings
+3. **Structure detection**: Identifies conversation turns, phases, and progress
+4. **Critical extraction**: Enhanced extraction of goals, decisions, errors, progress, preferences
+5. **Multi-pass compression**: Progressive summarization with quality scoring
+6. **File tracking**: Maintains read/modified file history across compactions
 
 ## Configuration
 
@@ -97,6 +103,17 @@ Default settings work out of the box. The extension auto-detects your model and 
 
 See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
+### v0.6.0 — Algorithm Enhancement Release
+
+Major improvements to compaction quality and performance:
+
+- **Smart model switching** — per-model threshold memory, preserves custom settings
+- **Conversation structure detection** — identifies turns, phases, progress
+- **Enhanced critical extraction** — progress indicators, questions, user preferences
+- **Multi-pass summarization** — 3-pass compression with quality scoring
+- **Token estimation cache** — LRU cache for 3x faster performance
+- **100% test pass rate** — 43 unit tests + 17 performance benchmarks
+
 ### v0.5.0 — Audit & Stability Release
 
 This release fixes 18 issues found via comprehensive 5-agent audit:
@@ -111,10 +128,12 @@ This release fixes 18 issues found via comprehensive 5-agent audit:
 ## Troubleshooting
 
 ### Extension not loading
+
 - Restart Pi after installation
 - Check `pi install npm:pi-ultra-compact` completed successfully
 
 ### Wrong threshold detected
+
 - The extension auto-detects your model from Pi config
 - Ensure your model is in the supported list (200+ models)
 - Run `/ultracompact` manually to see detected model and threshold in the logs

@@ -314,10 +314,12 @@ describe("UltraCompactEngine", () => {
 		});
 
 		it("includes Conversation Summary for compressible messages", () => {
-			const engine = new UltraCompactEngine();
-			const msgs = [
-				makeMsg("1", "user", "Just a regular conversational message"),
-			];
+			const engine = new UltraCompactEngine({ thresholdTokens: 1000 });
+			// Create enough messages to exceed the 20000 token protection budget (each ~40 tokens)
+			const msgs: Message[] = [];
+			for (let i = 0; i < 600; i++) {
+				msgs.push(makeMsg(String(i), "user", `Message ${i}: This is a test message with some content to make it longer and ensure we have enough tokens to exceed the protection budget for compressible messages`));
+			}
 			const result = engine.generateSummary(msgs);
 			expect(result.summary).toContain("## Conversation Summary");
 		});

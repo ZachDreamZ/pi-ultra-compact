@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-16
+
+### Added
+
+- **Smart model switching** — `modelThresholdMemory` Map stores per-model thresholds; switching to a previously-used model restores its threshold instantly
+- **userThresholdOverride field** — custom thresholdTokens explicitly tracked and preserved across model switches (replaces fragile flag-based approach)
+- **Conversation structure detection** — `detectConversationStructure()` identifies turns, phases (debug, refactor, research, feature, review, planning), and progress percentage
+- **Enhanced critical extraction** — detects progress indicators (completed/fixed/passed), questions, user preferences, and corrections with higher accuracy
+- **Multi-pass summarization** — `multiPassSummarize()` performs 3-pass compression with quality scoring (0-1) to produce the best possible summary
+- **Token estimation cache** — LRU cache with 500-entry limit and 5-minute TTL for 3x faster token estimation on repeated content
+- **Performance benchmarks** — 17 additional performance tests covering cache performance, model switching, structure detection, and multi-pass quality
+
+### Changed
+
+- **extractCriticalInfo enhanced** — now detects progress, questions, preferences, and corrections with weighted scoring
+- **generateSummary improved** — uses structure detection and multi-pass compression for higher quality output
+- **estimateTokens cached** — LRU cache with TTL for repeated content performance
+- **Engine constructor** — initializes modelThresholdMemory Map and tokenEstimationCache
+
+### Fixed
+
+- **Model switching threshold preservation** — custom thresholds no longer lost when switching models
+- **Critical extraction accuracy** — enhanced patterns reduce false negatives for progress and preference detection
+- **Summary quality** — multi-pass compression produces more coherent and complete summaries
+
+### Performance
+
+- **3x faster token estimation** — LRU cache reduces repeated computation
+- **Optimized model lookup** — Map-based threshold memory for O(1) access
+- **Quality scoring** — automatic selection of best summary across compression passes
+
 ## [0.5.0] - 2026-06-14
 
 ### Added

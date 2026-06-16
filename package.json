@@ -1,6 +1,6 @@
 {
   "name": "pi-ultra-compact",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Advanced compaction extension and skill for Pi with automatic threshold-based compaction and critical context preservation",
   "keywords": [
     "pi-package",
@@ -43,6 +43,7 @@
     "typescript": "^5.4.0"
   },
   "scripts": {
+    "build": "tsc",
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'Linting not configured yet'",
