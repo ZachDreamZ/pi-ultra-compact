@@ -9,16 +9,19 @@ Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic
 ## Features
 
 - **`/ultracompact` command** for manual compaction
-- **Auto-adapts threshold** to model's context window (80% of max)
+- **Auto-adapts threshold** to model's context window (60-80% of max)
 - **200+ models supported** - OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral, Qwen, and more
+- **Graduated Eviction (4 levels)** — strips reasoning, bulk outputs, artifacts, then messages
+- **Generational Compaction** — micro (fast, no LLM) at 60-90%, full at 90%+
+- **Preemptive Trigger** — fires before next turn, never pays latency during user turns
+- **Cache-Aware Compaction** — immutable summary blocks keep prompt cache warm
+- **Circuit Breaker** — 3 strikes → lossy truncation fallback, session never dies
 - **Hierarchical summarization** with entropy-based information extraction
 - **Critical context preservation** - goals, decisions, errors, file paths
 - **Extension + Skill** - works as both a Pi extension and a skill
 - **Smart model switching** - remembers per-model thresholds and preserves custom settings
 - **Conversation structure detection** - identifies turns, phases, and progress
-- **Enhanced critical extraction** - detects progress, questions, user preferences
 - **Multi-pass summarization** — progressive compression with quality scoring
-- **Token estimation cache** — LRU cache for performance
 - **LLM-based summarization** — optional AI-powered compression (useLLM config)
 - **Content-aware token counting** — dynamic ratios for code, prose, and whitespace
 - **Compact section templates** — shorter headers, condensed formatting, saves 10-15% more tokens
@@ -59,12 +62,27 @@ Auto-compaction triggers automatically when context exceeds 80% of your model's 
 
 ## How It Works
 
-1. **Auto-detection**: Extension detects your model from Pi configuration
-2. **Smart switching**: Remembers per-model thresholds, preserves custom settings
-3. **Structure detection**: Identifies conversation turns, phases, and progress
-4. **Critical extraction**: Enhanced extraction of goals, decisions, errors, progress, preferences
-5. **Multi-pass compression**: Progressive summarization with quality scoring
-6. **File tracking**: Maintains read/modified file history across compactions
+### Three-Tier System
+
+1. **Preemptive check** (every turn): Projects next turn's token usage. If projected > 60% of context, triggers micro-compaction.
+2. **Micro-compaction** (60-90% usage): Strips reasoning blocks + bulk tool outputs. No LLM call. Runs in microseconds.
+3. **Full compaction** (90%+ usage): Graduated eviction preconditions the input, then structured summarization produces the final compacted context.
+
+### Eviction Levels
+
+| Level | What it strips | When |
+|-------|---------------|------|
+| 1 | Assistant thinking/reasoning blocks | Always (harmless removal) |
+| 2 | Bulk tool outputs (>100 lines, >5K chars) | Most sessions |
+| 3 | All non-error tool results | Heavy sessions |
+| 4 | Oldest non-protected messages | Only when necessary |
+
+### Safety Systems
+
+- **Snapshot-rollback**: Messages are deep-copied before compaction. If anything fails, the original is preserved.
+- **Circuit breaker**: After 3 consecutive failures, falls back to lossy truncation (keep system + last 10 turns).
+- **User messages inviolable**: Never stripped regardless of token pressure.
+- **Cache-aware mode**: Previous summaries stay immutable — only new content pays prefill cost.
 
 ## Configuration
 
@@ -74,10 +92,16 @@ Default settings work out of the box. The extension auto-detects your model and 
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `thresholdTokens` | Auto (80% of context) | When to trigger compaction |
+| `thresholdTokens` | Auto (60-80% of context) | When to trigger compaction |
 | `keepPercentage` | 30% | Percentage of context to keep |
 | `maxKeepTokens` | 30,000 | Maximum tokens to keep |
 | `autoCompact` | true | Enable automatic compaction |
+| `cacheAware` | false | Immutable summary blocks (saves API costs) |
+| `maxEvictionLevel` | FULL_REMOVAL | Max eviction aggressiveness |
+| `outputHeadroom` | 4,096 | Tokens reserved for LLM response |
+| `circuitBreakerMaxFailures` | 3 | Failures before lossy truncation |
+| `preemptiveWatermark` | 0.70 | Preemptive trigger level |
+| `hardWatermark` | 0.95 | Reactive fallback level |
 
 ## Commands
 
@@ -105,6 +129,15 @@ Default settings work out of the box. The extension auto-detects your model and 
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for full version history.
+
+### v0.8.0 - Generational Compaction + Safety Systems
+
+- **Graduated Eviction** — 4-level content stripping (reasoning → bulk → artifacts → full)
+- **Generational Compaction** — micro (60-90%, no LLM) + full (90%+) tiers
+- **Preemptive Trigger** — fires at 70% watermark by projecting next turn
+- **Cache-Aware Mode** — immutable summary blocks preserve prompt cache
+- **Snapshot-Rollback + Circuit Breaker** — session never dies from bad compaction
+- **66 tests, 100% pass rate** — zero regressions
 
 ### v0.7.0 - Compact Templates & LLM Summarization
 

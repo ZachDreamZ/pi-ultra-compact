@@ -94,14 +94,40 @@ function handleUltracompactCommand(
 /**
  * Handle session_before_compact event — automatic compaction intercept.
  * Also fired when the /ultracompact command calls ctx.compact().
+ *
+ * Features:
+ * - Preemptive trigger: fires at 70% watermark by projecting next turn
+ * - Tier-aware: uses micro (no LLM) at 60-90%, full at 90%+
+ * - Circuit breaker: trips after N failures, falls back to lossy truncation
+ * - Cache-aware: appends to previous summary (keeps prefix stable)
  */
 function handleBeforeCompact(
 	engine: UltraCompactEngine,
 ): (event: any, ctx: any) => Record<string, any> | undefined {
+	// Circuit breaker state (per-session)
+	let compactionFailures = 0;
+	let breakerTrippedAtTurn: number | null = null;
+	let currentTurn = 0;
+
 	return async (event: any, ctx: any) => {
-		// Capture model from ctx at runtime for maximum accuracy.
-		// handleBeforeCompact fires after model_select has already updated currentModel,
-		// so the separate reconfigureEngineForCurrentModel() call was redundant.
+		currentTurn++;
+
+		// ── Circuit breaker check ───────────────────────────────────────
+		if (breakerTrippedAtTurn !== null) {
+			const COOLDOWN_TURNS = engine["config"]?.circuitBreakerCooldown ?? 5;
+			if (currentTurn - breakerTrippedAtTurn < COOLDOWN_TURNS) {
+				console.warn(
+					`[pi-ultra-compact] Circuit breaker open (turn ${currentTurn}), using default compaction`,
+				);
+				return undefined; // Fall back to Pi default
+			}
+			// Cool-down expired, reset breaker
+			compactionFailures = 0;
+			breakerTrippedAtTurn = null;
+			console.log("[pi-ultra-compact] Circuit breaker reset");
+		}
+
+		// Capture model from ctx at runtime
 		if (ctx?.model?.id && ctx.model.id !== currentModel?.id) {
 			currentModel = {
 				id: ctx.model.id,
@@ -109,7 +135,6 @@ function handleBeforeCompact(
 			};
 			engine.reconfigure(ctx.model.id);
 		} else if (currentModel?.id) {
-			// Ensure engine is configured for the current model
 			engine.reconfigure(currentModel.id);
 		}
 
@@ -117,26 +142,104 @@ function handleBeforeCompact(
 		if (!preparation) {
 			return undefined;
 		}
+
 		const currentTokens = preparation.tokensBefore;
+		const messagesToCompact = preparation.messagesToSummarize;
 		const isManual = event?.customInstructions === "ultracompact";
 
-		// Skip threshold check for manual /ultracompact command
-		if (!isManual && !engine.shouldCompact(currentTokens)) {
+		if (!Array.isArray(messagesToCompact) || messagesToCompact.length === 0) {
 			return undefined;
 		}
 
+		// ── Preemptive trigger ──────────────────────────────────────────
+		// Project next turn's token usage (current + headroom for tool result + output)
+		const outputHeadroom = engine["config"]?.outputHeadroom ?? 4096;
+		const projectedTokens = currentTokens + outputHeadroom;
+
+		// Use preemptive check for auto, reactive for manual
+		const effectiveTokens = isManual ? currentTokens : projectedTokens;
+
+		if (!isManual && !engine.shouldCompact(effectiveTokens)) {
+			return undefined; // No compaction needed
+		}
+
+		const tier = isManual
+			? ("full" as const)
+			: engine["config"]?.cacheAware
+				? ("auto" as const)
+				: ("full" as const);
+
 		if (typeof ctx.ui?.notify === "function") {
 			ctx.ui.notify(
-				`Ultra-compact threshold reached (${currentTokens.toLocaleString()} > ${engine.shouldCompactDefaultThreshold().toLocaleString()}), using advanced compaction...`,
+				tier === "auto" && engine.determineTier(messagesToCompact) === 1
+					? `Ultra-compact micro compacting ${currentTokens.toLocaleString()} tokens…`
+					: `Ultra-compact threshold reached (${currentTokens.toLocaleString()}), compacting…`,
 				"info",
 			);
 		}
 
+		// ── Snapshot ────────────────────────────────────────────────────
+		const snapshot = JSON.parse(JSON.stringify(messagesToCompact));
+		let snapshotPreviousSummary = preparation.previousSummary;
+
 		try {
-			const result = await engine.generateSummary(
-				preparation.messagesToSummarize,
-				preparation.previousSummary,
-			);
+			// ── Cache-Aware: append instead of rewrite ──────────────────
+			// When cache-aware is enabled, the previous summary is kept as-is
+			// and only the NEW content is summarized. This keeps the prefix stable
+			// for prompt caching.
+			const isCacheAware = engine["config"]?.cacheAware ?? false;
+			let cacheAwarePrefix = "";
+
+			if (isCacheAware && snapshotPreviousSummary) {
+				// Keep the previous summary block immutable — append new content
+				cacheAwarePrefix = snapshotPreviousSummary;
+				snapshotPreviousSummary = undefined; // Don't re-summarize
+			}
+
+			// ── Tier-aware compaction ───────────────────────────────────
+			let result: import("./types").CompactionResult;
+
+			if (
+				!isManual &&
+				engine.determineTier(messagesToCompact) === 1 // MICRO
+			) {
+				// Micro-compaction: no LLM, just strip tool outputs
+				const micro = engine.microCompact(messagesToCompact);
+				const conversationText = micro.messages
+					.map(
+						(m: any) =>
+							`[${m.role}]: ${typeof m.content === "string" ? m.content.substring(0, 200) : ""}`,
+					)
+					.join("\n");
+				result = {
+					summary: isCacheAware
+						? cacheAwarePrefix + "\n\n## Chat\n" + conversationText
+						: "## Chat\n" + conversationText,
+					tokensBefore: currentTokens,
+					tokensAfter: engine.estimateTokens(micro.messages),
+					compressionRatio: 0,
+					readFiles: [],
+					modifiedFiles: [],
+					timestamp: Date.now(),
+				};
+			} else {
+				// Full compaction
+				result = await engine.generateSummary(
+					snapshot,
+					snapshotPreviousSummary,
+				);
+				if (isCacheAware && cacheAwarePrefix) {
+					result.summary = cacheAwarePrefix + "\n\n" + result.summary;
+				}
+			}
+
+			// ── Validate output ─────────────────────────────────────────
+			if (!result.summary || result.summary.trim().length === 0) {
+				throw new Error("Empty summary returned from compaction");
+			}
+
+			// Success — reset circuit breaker
+			compactionFailures = 0;
 
 			return {
 				compaction: {
@@ -152,10 +255,64 @@ function handleBeforeCompact(
 				},
 			};
 		} catch (error) {
+			// ── Circuit breaker ─────────────────────────────────────────
+			compactionFailures++;
 			console.error(
-				"[pi-ultra-compact] Auto-compaction failed, falling back to default:",
+				`[pi-ultra-compact] Compaction failed (${compactionFailures}/${engine["config"]?.circuitBreakerMaxFailures ?? 3}):`,
 				error,
 			);
+
+			if (
+				compactionFailures >= (engine["config"]?.circuitBreakerMaxFailures ?? 3)
+			) {
+				breakerTrippedAtTurn = currentTurn;
+				console.error(
+					"[pi-ultra-compact] Circuit breaker tripped! Using lossy truncation.",
+				);
+
+				// ── Lossy truncation (last resort) ──────────────────────
+				const tailKeep = 10;
+				const system = snapshot.filter((m: any) => m.role === "system");
+				const nonSystem = snapshot.filter((m: any) => m.role !== "system");
+				const tail = nonSystem.slice(-tailKeep);
+
+				const lossySummary = [
+					...system.map(
+						(m: any) =>
+							`[System]: ${typeof m.content === "string" ? m.content : ""}`,
+					),
+					"",
+					"[earlier history truncated — circuit breaker engaged]",
+					"",
+					...tail.map(
+						(m: any) =>
+							`${typeof m.content === "string" ? `[${m.role}]: ${m.content.substring(0, 500)}` : ""}`,
+					),
+				]
+					.filter(Boolean)
+					.join("\n");
+
+				if (typeof ctx.ui?.notify === "function") {
+					ctx.ui.notify(
+						"Compaction failed repeatedly — emergency truncation applied",
+						"warning",
+					);
+				}
+
+				return {
+					compaction: {
+						summary: lossySummary,
+						firstKeptEntryId: preparation.firstKeptEntryId,
+						tokensBefore: preparation.tokensBefore,
+						details: {
+							ultracompact: true,
+							circuitBreakerEngaged: true,
+						},
+					},
+				};
+			}
+
+			// Fall back to Pi's default compaction
 			return undefined;
 		}
 	};

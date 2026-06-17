@@ -2,6 +2,28 @@
  * Types for pi-ultra-compact extension
  */
 
+/** Eviction levels for graduated content stripping */
+export enum EvictionLevel {
+	/** Remove assistant thinking/reasoning blocks */
+	STRIP_REASONING = 1,
+	/** Remove large tool outputs (directory listings, grep results) */
+	STRIP_BULK_OUTPUT = 2,
+	/** Remove all non-error tool results */
+	STRIP_ARTIFACTS = 3,
+	/** Remove entire non-protected messages */
+	FULL_REMOVAL = 4,
+}
+
+/** Stats from an eviction pass */
+export interface EvictionStats {
+	/** How many messages were modified */
+	messagesStripped: number;
+	/** Tokens saved by eviction */
+	tokensSaved: number;
+	/** The highest eviction level that was needed (1-4) */
+	levelUsed: EvictionLevel;
+}
+
 /** Configuration for ultra-compact compaction */
 export interface UltraCompactConfig {
 	/** Token threshold to trigger automatic compaction */
@@ -18,6 +40,20 @@ export interface UltraCompactConfig {
 	minMessagesForCompression?: number;
 	/** Use Pi's model for smart LLM summarization (optional) */
 	useLLM?: boolean;
+	/** Max eviction aggressiveness (graduated eviction cap, default FULL_REMOVAL) */
+	maxEvictionLevel?: EvictionLevel;
+	/** Enable cache-aware compaction (immutable prefix, append-only summaries) */
+	cacheAware?: boolean;
+	/** Soft watermark for preemptive compaction (default 0.70 = 70%) */
+	preemptiveWatermark?: number;
+	/** Hard watermark for reactive compaction fallback (default 0.95) */
+	hardWatermark?: number;
+	/** Tokens to reserve for model output during preemptive check */
+	outputHeadroom?: number;
+	/** Max failures before circuit breaker trips (default 3) */
+	circuitBreakerMaxFailures?: number;
+	/** Turns before circuit breaker resets (default 5) */
+	circuitBreakerCooldown?: number;
 }
 
 /** Result of a compaction operation */
@@ -36,6 +72,30 @@ export interface CompactionResult {
 	modifiedFiles: string[];
 	/** Timestamp of the compaction */
 	timestamp: number;
+}
+
+/** Tier of compaction to perform */
+export enum CompactionTier {
+	/** No compaction needed */
+	NONE = 0,
+	/** Fast tool-output pruning only (no LLM) */
+	MICRO = 1,
+	/** Full structured summarization */
+	FULL = 2,
+}
+
+/** Stats from a micro-compaction pass */
+export interface MicroCompactStats {
+	tokensSaved: number;
+	messagesStripped: number;
+	filesCollapsed: string[];
+}
+
+/** State for the circuit breaker mechanism */
+export interface CircuitBreakerState {
+	failures: number;
+	trippedAtTurn: number;
+	turn: number;
 }
 
 /** Entry for tracking compaction history */

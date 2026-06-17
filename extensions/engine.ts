@@ -11,7 +11,13 @@
  * - Hierarchical summarization
  */
 
-import type { CompactionResult, Message } from "./types";
+import type {
+	CompactionResult,
+	Message,
+	EvictionStats,
+	MicroCompactStats,
+} from "./types";
+import { EvictionLevel, CompactionTier } from "./types";
 
 /**
  * Normalize message content to string, handling both plain text and structured arrays.
@@ -169,6 +175,13 @@ export class UltraCompactEngine {
 		useLLM: boolean;
 		/** Optional async LLM summarizer: receives conversation text, returns condensed summary */
 		llmSummarize?: (text: string) => Promise<string>;
+		maxEvictionLevel: import("./types").EvictionLevel;
+		cacheAware: boolean;
+		preemptiveWatermark: number;
+		hardWatermark: number;
+		outputHeadroom: number;
+		circuitBreakerMaxFailures: number;
+		circuitBreakerCooldown: number;
 	};
 
 	private contextWindow: number;
@@ -191,6 +204,13 @@ export class UltraCompactEngine {
 			minMessagesForCompression: config.minMessagesForCompression ?? 100,
 			useLLM: config.useLLM ?? false,
 			llmSummarize: config.llmSummarize,
+			maxEvictionLevel: config.maxEvictionLevel ?? EvictionLevel.FULL_REMOVAL,
+			cacheAware: config.cacheAware ?? false,
+			preemptiveWatermark: config.preemptiveWatermark ?? 0.7,
+			hardWatermark: config.hardWatermark ?? 0.95,
+			outputHeadroom: config.outputHeadroom ?? 4096,
+			circuitBreakerMaxFailures: config.circuitBreakerMaxFailures ?? 3,
+			circuitBreakerCooldown: config.circuitBreakerCooldown ?? 5,
 		};
 
 		if (config.thresholdTokens !== undefined) {
@@ -299,13 +319,6 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Check if compaction is needed based on token count
-	 */
-	public shouldCompact(currentTokens: number): boolean {
-		return currentTokens >= this.config.thresholdTokens;
-	}
-
-	/**
 	 * Get the effective threshold used by shouldCompact
 	 */
 	public shouldCompactDefaultThreshold(): number {
@@ -361,6 +374,94 @@ export class UltraCompactEngine {
 	 * 3. Summarize: Generate structured summary
 	 * 4. Merge: Combine with protected messages
 	 */
+
+	/**
+	 * Determine which compaction tier to use based on token usage.
+	 *
+	 * - NONE: < 60% usage — no compaction needed
+	 * - MICRO: 60-90% usage — fast tool-output pruning (no LLM)
+	 * - FULL: >= 90% usage — full structured summarization
+	 */
+	public determineTier(messages: Message[]): CompactionTier {
+		const tokens = this.estimateTokens(messages);
+		const ratio = this.contextWindow > 0 ? tokens / this.contextWindow : 0;
+
+		if (ratio >= 0.9) return CompactionTier.FULL;
+		if (ratio >= 0.6) return CompactionTier.MICRO;
+		return CompactionTier.NONE;
+	}
+
+	/**
+	 * Micro-compaction: fast tool-output pruning without LLM summarization.
+	 *
+	 * Uses graduated eviction at levels 1-2 (strip reasoning + bulk outputs).
+	 * Suitable for 60-90% context usage where the budget can be recovered
+	 * by pruning tool outputs alone.
+	 *
+	 * @returns MicroCompactStats with details about what was stripped
+	 */
+	public microCompact(
+		messages: Message[],
+	): { messages: Message[] } & MicroCompactStats {
+		const before = this.estimateTokens(messages);
+		const targetBudget = Math.floor(this.contextWindow * 0.5); // Target 50% usage
+
+		const evicted = this.evictGradually(
+			messages,
+			targetBudget,
+			EvictionLevel.STRIP_BULK_OUTPUT, // Levels 1-2 only
+		);
+
+		const after = this.estimateTokens(evicted.messages);
+
+		return {
+			messages: evicted.messages,
+			tokensSaved: before - after,
+			messagesStripped: evicted.stats.messagesStripped,
+			filesCollapsed: [],
+		};
+	}
+
+	/**
+	 * Tier-aware compaction — automatically selects micro or full based on usage.
+	 *
+	 * @param messages Messages to compact
+	 * @param tier Optional override tier (auto-detected if omitted)
+	 */
+	public async compact(
+		messages: Message[],
+		previousSummary?: string,
+		tier?: CompactionTier,
+	): Promise<CompactionResult> {
+		const actualTier = tier ?? this.determineTier(messages);
+
+		if (actualTier === CompactionTier.MICRO) {
+			const result = this.microCompact(messages);
+			const tokensBefore = this.estimateTokens(messages);
+			const tokensAfter = this.estimateTokens(result.messages);
+
+			return {
+				summary: "",
+				tokensBefore,
+				tokensAfter,
+				compressionRatio: tokensBefore > 0 ? tokensAfter / tokensBefore : 1,
+				readFiles: [],
+				modifiedFiles: [],
+				timestamp: Date.now(),
+			};
+		}
+
+		return this.generateSummary(messages, previousSummary);
+	}
+
+	/**
+	 * Check if compaction is needed based on token count.
+	 * Returns true at 60%+ usage (lower threshold for micro-compact).
+	 */
+	public shouldCompact(currentTokens: number): boolean {
+		return currentTokens >= Math.floor(this.contextWindow * 0.6);
+	}
+
 	public async generateSummary(
 		messages: Message[],
 		previousSummary?: string,
@@ -387,45 +488,43 @@ export class UltraCompactEngine {
 			discardable: _discardable,
 		} = this.classifyMessages(preprocessed);
 
-		// Phase 2a: For small conversations, skip structured summary
+		const tokensBefore = this.estimateTokens(messages);
+		const targetBudget = this.calculateKeepTokens(tokensBefore);
+
+		// Phase 3: Attempt graduated eviction first to strip content before summarization
+		// (eviction reduces the input size, making the structured summary more compact)
 		let summary: string;
-		// Phase 2a: For conversations with few compressible tokens, skip structured summary
-		// (structured sections add ~300 tokens overhead, so < 500 tokens isn't worth it)
-		// Note: shouldCompact() already prevents running on small conversations,
-		// so we always generate the full structured summary here.
-		if (
-			this.config.useLLM &&
-			typeof this.config.llmSummarize === "function"
-		) {
-			// Phase 2b: Optional LLM-based summarization (high quality)
-			const llmInput = compressible
-				.map((m) => `[${m.role}] ${messageContent(m).substring(0, 500)}`)
-				.join("\n---\n");
-			try {
-				const llmResult = await this.config.llmSummarize(llmInput);
-				const header = previousSummary
-					? `## Previous Context\n${previousSummary}\n\n`
-					: "";
-				summary = `${header}## Summary\n${llmResult}`;
-			} catch {
-				// Fallback to heuristic if LLM fails
-				summary = this.generateStructuredSummary(
-					compressible,
-					protectedMsgs,
-					previousSummary,
-				);
-			}
-		} else {
-			// Phase 2c: Standard heuristic structured summary
-			summary = this.generateStructuredSummary(
+
+		if (compressible.length > 0) {
+			const evicted = this.evictGradually(
 				compressible,
+				targetBudget,
+				this.config.maxEvictionLevel ?? EvictionLevel.FULL_REMOVAL,
+			);
+
+			// Always generate structured summary from the remaining content.
+			// Graduated eviction strips noise first so the summary is more compact.
+			summary = await this.generateSummaryFromRemaining(
+				evicted.messages,
 				protectedMsgs,
 				previousSummary,
 			);
+		} else if (protectedMsgs.length > 0) {
+			// All messages were classified as protected (important content) —
+			// still need a structured summary to extract and format the content
+			summary = await this.generateSummaryFromRemaining(
+				protectedMsgs,
+				[],
+				previousSummary,
+			);
+		} else {
+			// No compressible messages — just use previous summary or empty
+			summary = previousSummary || "";
 		}
 
 		// Phase 4: Calculate metrics
-		const tokensBefore = this.estimateTokens(messages);
+
+		// Phase 5: Calculate metrics
 		const protectedTokens = this.estimateTokens(protectedMsgs);
 		const summaryTokens = this.estimateTokens([
 			{
@@ -739,6 +838,298 @@ export class UltraCompactEngine {
 	}
 
 	/**
+	 * Graduated eviction — strip content in incremental levels.
+	 *
+	 * Each level removes progressively more content, re-checking the token
+	 * budget after each pass. Stops as soon as the budget is satisfied.
+	 *
+	 * Levels:
+	 *   1. STRIP_REASONING — Remove assistant thinking/reasoning blocks
+	 *   2. STRIP_BULK_OUTPUT — Remove large tool outputs (>100 lines, >5000 chars)
+	 *   3. STRIP_ARTIFACTS — Remove all non-error tool results
+	 *   4. FULL_REMOVAL — Remove oldest non-protected messages (never user/system)
+	 *
+	 * @returns stats about what was stripped and at what level
+	 */
+	public evictGradually(
+		messages: Message[],
+		tokenBudget: number,
+		maxLevel: EvictionLevel = EvictionLevel.FULL_REMOVAL,
+	): { messages: Message[]; stats: EvictionStats } {
+		if (!Array.isArray(messages) || messages.length === 0) {
+			return {
+				messages: [],
+				stats: {
+					messagesStripped: 0,
+					tokensSaved: 0,
+					levelUsed: EvictionLevel.STRIP_REASONING,
+				},
+			};
+		}
+
+		let current = [...messages];
+		const currentTokens = this.estimateTokens(current);
+
+		// Budget already satisfied — no eviction needed
+		if (currentTokens <= tokenBudget) {
+			return {
+				messages: current,
+				stats: {
+					messagesStripped: 0,
+					tokensSaved: 0,
+					levelUsed: EvictionLevel.STRIP_REASONING,
+				},
+			};
+		}
+
+		let totalStripped = 0;
+
+		// ── Level 1: Strip reasoning blocks from assistant messages ──────────
+		if (maxLevel >= EvictionLevel.STRIP_REASONING) {
+			const before = this.estimateTokens(current);
+			current = this.stripReasoningBlocks(current);
+			const after = this.estimateTokens(current);
+			const saved = before - after;
+			totalStripped += saved;
+
+			if (after <= tokenBudget) {
+				return {
+					messages: current,
+					stats: {
+						messagesStripped: saved,
+						tokensSaved: saved,
+						levelUsed: EvictionLevel.STRIP_REASONING,
+					},
+				};
+			}
+		}
+
+		// ── Level 2: Strip bulk tool outputs (>100 lines, >5000 chars) ──────
+		if (maxLevel >= EvictionLevel.STRIP_BULK_OUTPUT) {
+			const before = this.estimateTokens(current);
+			current = this.stripBulkToolOutputs(current);
+			const after = this.estimateTokens(current);
+			const saved = before - after;
+			totalStripped += saved;
+
+			if (after <= tokenBudget) {
+				return {
+					messages: current,
+					stats: {
+						messagesStripped: saved,
+						tokensSaved: saved,
+						levelUsed: EvictionLevel.STRIP_BULK_OUTPUT,
+					},
+				};
+			}
+		}
+
+		// ── Level 3: Strip all non-error tool outputs ────────────────────────
+		if (maxLevel >= EvictionLevel.STRIP_ARTIFACTS) {
+			const before = this.estimateTokens(current);
+			current = this.stripArtifactToolOutputs(current);
+			const after = this.estimateTokens(current);
+			const saved = before - after;
+			totalStripped += saved;
+
+			if (after <= tokenBudget) {
+				return {
+					messages: current,
+					stats: {
+						messagesStripped: saved,
+						tokensSaved: saved,
+						levelUsed: EvictionLevel.STRIP_ARTIFACTS,
+					},
+				};
+			}
+		}
+
+		// ── Level 4: Full message removal (oldest non-protected first) ────────
+		if (maxLevel >= EvictionLevel.FULL_REMOVAL) {
+			const before = this.estimateTokens(current);
+			current = this.removeOldCompressibleMessages(current, tokenBudget);
+			const after = this.estimateTokens(current);
+			const saved = before - after;
+			totalStripped += saved;
+
+			return {
+				messages: current,
+				stats: {
+					messagesStripped: saved,
+					tokensSaved: saved,
+					levelUsed: EvictionLevel.FULL_REMOVAL,
+				},
+			};
+		}
+
+		return {
+			messages: current,
+			stats: {
+				messagesStripped: totalStripped,
+				tokensSaved: totalStripped,
+				levelUsed: maxLevel,
+			},
+		};
+	}
+
+	/**
+	 * Strip reasoning/thinking blocks from assistant messages.
+	 * Removes content where type === "thinking" from structured message content arrays.
+	 */
+	private stripReasoningBlocks(messages: Message[]): Message[] {
+		return messages.map((msg) => {
+			if (msg.role !== "assistant") return msg;
+			if (!Array.isArray(msg.content)) return msg;
+
+			const hasThinking = msg.content.some((b: any) => b?.type === "thinking");
+			if (!hasThinking) return msg;
+
+			const newContent = msg.content.filter((b: any) => b?.type !== "thinking");
+			// If all content was thinking, keep a placeholder
+			if (newContent.length === 0) {
+				return { ...msg, content: "[reasoning stripped]" };
+			}
+			return { ...msg, content: newContent };
+		});
+	}
+
+	/**
+	 * Strip bulk tool outputs (large file reads, directory listings).
+	 * Only targets outputs > 100 lines or > 5000 characters of plain text.
+	 */
+	private stripBulkToolOutputs(messages: Message[]): Message[] {
+		return messages.map((msg) => {
+			if (msg.role !== "tool") return msg;
+			const content = messageContent(msg);
+
+			// Only strip if it's genuinely large
+			if (content.length < 5000) return msg;
+
+			const lines = content.split("\n");
+
+			// Check for directory-like output (many lines, each short)
+			if (lines.length > 100) {
+				const truncated = content.substring(0, 3000);
+				return {
+					...msg,
+					content: `[tool output truncated: ${lines.length} lines, ${content.length} chars]\n${truncated}`,
+				};
+			}
+
+			return msg;
+		});
+	}
+
+	/**
+	 * Strip all non-error tool outputs — replace with concise summaries.
+	 * Preserves error messages (they're critical context for debugging).
+	 */
+	private stripArtifactToolOutputs(messages: Message[]): Message[] {
+		return messages.map((msg) => {
+			if (msg.role !== "tool") return msg;
+			const content = messageContent(msg);
+
+			// Preserve error outputs
+			if (
+				content.includes("Error:") ||
+				content.includes("error:") ||
+				content.includes("failed") ||
+				content.includes("Failed") ||
+				content.includes("exit code") ||
+				content.includes("exit status") ||
+				content.includes("SyntaxError") ||
+				content.includes("TypeError")
+			) {
+				return msg;
+			}
+
+			// Determine what kind of output it was
+			const lines = content.split("\n").length;
+			const firstLine = content.split("\n")[0]?.substring(0, 80) || "";
+			const shortSummary = firstLine.substring(0, 120);
+
+			return {
+				...msg,
+				content: `[tool result stripped: ${lines} lines | ${shortSummary}${firstLine.length > 120 ? "…" : ""}]`,
+			};
+		});
+	}
+
+	/**
+	 * Remove oldest non-protected, non-user messages until token budget is met.
+	 * Never removes user or system messages (inviolable).
+	 */
+	private removeOldCompressibleMessages(
+		messages: Message[],
+		tokenBudget: number,
+	): Message[] {
+		// Separate into protected (keep) and candidates for removal
+		const protectedMsgs: Message[] = [];
+		const candidates: Message[] = [];
+
+		for (const msg of messages) {
+			if (msg.role === "user" || msg.role === "system") {
+				protectedMsgs.push(msg);
+			} else {
+				// Check importance — keep high-importance messages
+				const importance = this.calculateMessageImportance(msg);
+				if (importance > 0.7) {
+					protectedMsgs.push(msg);
+				} else {
+					candidates.push(msg);
+				}
+			}
+		}
+
+		// Keep removing from oldest until budget is satisfied
+		const result = [...protectedMsgs];
+		const initialTokens = this.estimateTokens(result);
+
+		// Add back candidates from newest to oldest while staying under budget
+		for (let i = candidates.length - 1; i >= 0; i--) {
+			const candidateTokens = this.estimateTokens([candidates[i]]);
+			if (initialTokens + candidateTokens <= tokenBudget) {
+				result.push(candidates[i]);
+				// Need to re-check budget with newly added message
+			}
+		}
+
+		// Sort back to original order
+		const keptIds = new Set(result.map((m) => m.id));
+		return messages.filter((m) => keptIds.has(m.id));
+	}
+
+	/**
+	 * Generate a summary from remaining messages after graduated eviction.
+	 * Tries LLM summarization if configured, otherwise uses heuristic structured format.
+	 */
+	private async generateSummaryFromRemaining(
+		compressible: Message[],
+		protectedMsgs: Message[],
+		previousSummary?: string,
+	): Promise<string> {
+		if (this.config.useLLM && typeof this.config.llmSummarize === "function") {
+			const llmInput = compressible
+				.map((m) => `[${m.role}] ${messageContent(m).substring(0, 500)}`)
+				.join("\n---\n");
+			try {
+				const llmResult = await this.config.llmSummarize(llmInput);
+				const header = previousSummary
+					? `## Previous Context\n${previousSummary}\n\n`
+					: "";
+				return header + "## Summary\n" + llmResult;
+			} catch {
+				// Fallback to heuristic if LLM fails
+			}
+		}
+		return this.generateStructuredSummary(
+			compressible,
+			protectedMsgs,
+			previousSummary,
+		);
+	}
+
+	/**
 	 * Phase 3: Generate structured summary (compact format)
 	 * Uses terse headers, skips empty sections, and avoids extra whitespace.
 	 */
@@ -1045,7 +1436,7 @@ export class UltraCompactEngine {
 	 *   - Plain prose: ~5 chars/token
 	 *   - Whitespace-heavy: ~6 chars/token (tool outputs, tables)
 	 */
-	private estimateTokens(messages: Message[]): number {
+	public estimateTokens(messages: Message[]): number {
 		if (!Array.isArray(messages)) return 0;
 
 		let total = 0;

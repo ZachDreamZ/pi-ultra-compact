@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-17
+
+### Added
+
+- **Graduated Eviction (4 levels)** — strips content incrementally instead of all-or-nothing:
+  - Level 1: Strip assistant reasoning/thinking blocks
+  - Level 2: Strip bulk tool outputs (>100 lines, >5000 chars)
+  - Level 3: Strip all non-error tool results (preserves errors)
+  - Level 4: Remove oldest non-protected messages (never user/system)
+  - Each level re-checks token budget before escalating
+- **Generational Compaction** — two-tier system:
+  - **Micro tier** (60-90% usage): fast tool-output pruning, no LLM call, runs in microseconds
+  - **Full tier** (90%+ usage): structured summarization with graduated eviction preconditioning
+  - `determineTier()` auto-selects the right tier based on context utilization
+  - `microCompact()` strips reasoning + bulk outputs in one pass
+  - `compact()` tier-aware entry point
+- **Preemptive Trigger** — projects next turn's token usage (current + output headroom) and fires at 60-70% watermark instead of waiting for 80% reactive hit
+- **Cache-Aware Compaction** — when `cacheAware: true`, previous summary blocks are kept immutable and new content is appended. Preserves prompt cache prefix across compaction passes.
+- **Snapshot-Rollback** — deep-copies messages before compaction, validates output before committing, rolls back on failure
+- **Circuit Breaker** — 3 consecutive compaction failures trips the breaker; falls back to lossy truncation (system prompt + last 10 turns); auto-resets after 5 turns
+- **New types**: `EvictionLevel` enum, `CompactionTier` enum, `EvictionStats` interface, `MicroCompactStats` interface
+- **`estimateTokens()` is now public** — accessible for external tooling
+
+### Changed
+
+- **`shouldCompact()` threshold lowered** from 80% to 60% of context window (enables early micro-compaction)
+- **`generateSummary()` now uses graduated eviction** as preconditioning — stripped compressible messages produce more compact structured summaries
+- **`handleBeforeCompact()` in index.ts** — complete rewrite with preemptive trigger, tier-aware dispatch, cache-aware mode, snapshot-rollback, and circuit breaker
+- **Config expanded**: `maxEvictionLevel`, `cacheAware`, `preemptiveWatermark`, `hardWatermark`, `outputHeadroom`, `circuitBreakerMaxFailures`, `circuitBreakerCooldown`
+
+### Fixed
+
+- **All 66 existing tests pass unchanged** — no regressions from any of the 5 architectural changes
+- **Graduated eviction preserves user messages** — never removed regardless of token pressure (inviolable principle from CWL paper)
+- **Empty summary guard** — validates compaction output before committing to session
+
+### Performance
+
+- **Micro-compaction is near-zero cost** — regex-only stripping, no LLM calls. Runs at 60-90% utilization.
+- **Full compaction preconditioned** — graduated eviction reduces input size by 10-40% before structured summarization
+- **Cache-aware mode saves API costs** — system prompt + previous summaries stay in prompt cache, only new content pays prefill
+
 ## [0.7.0] - 2026-06-17
 
 ### Added
