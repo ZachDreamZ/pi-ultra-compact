@@ -165,6 +165,10 @@ export class UltraCompactEngine {
 		keepPercentage: number;
 		maxKeepTokens: number;
 		modelName?: string;
+		minMessagesForCompression: number;
+		useLLM: boolean;
+		/** Optional async LLM summarizer: receives conversation text, returns condensed summary */
+		llmSummarize?: (text: string) => Promise<string>;
 	};
 
 	private contextWindow: number;
@@ -184,6 +188,9 @@ export class UltraCompactEngine {
 			keepPercentage: config.keepPercentage ?? 0.3,
 			maxKeepTokens: config.maxKeepTokens ?? 30000,
 			modelName: config.modelName,
+			minMessagesForCompression: config.minMessagesForCompression ?? 100,
+			useLLM: config.useLLM ?? false,
+			llmSummarize: config.llmSummarize,
 		};
 
 		if (config.thresholdTokens !== undefined) {
@@ -354,10 +361,10 @@ export class UltraCompactEngine {
 	 * 3. Summarize: Generate structured summary
 	 * 4. Merge: Combine with protected messages
 	 */
-	public generateSummary(
+	public async generateSummary(
 		messages: Message[],
 		previousSummary?: string,
-	): CompactionResult {
+	): Promise<CompactionResult> {
 		if (!Array.isArray(messages) || messages.length === 0) {
 			return {
 				summary: previousSummary || "",
@@ -380,12 +387,42 @@ export class UltraCompactEngine {
 			discardable: _discardable,
 		} = this.classifyMessages(preprocessed);
 
-		// Phase 3: Summarization
-		const summary = this.generateStructuredSummary(
-			compressible,
-			protectedMsgs,
-			previousSummary,
-		);
+		// Phase 2a: For small conversations, skip structured summary
+		let summary: string;
+		// Phase 2a: For conversations with few compressible tokens, skip structured summary
+		// (structured sections add ~300 tokens overhead, so < 500 tokens isn't worth it)
+		// Note: shouldCompact() already prevents running on small conversations,
+		// so we always generate the full structured summary here.
+		if (
+			this.config.useLLM &&
+			typeof this.config.llmSummarize === "function"
+		) {
+			// Phase 2b: Optional LLM-based summarization (high quality)
+			const llmInput = compressible
+				.map((m) => `[${m.role}] ${messageContent(m).substring(0, 500)}`)
+				.join("\n---\n");
+			try {
+				const llmResult = await this.config.llmSummarize(llmInput);
+				const header = previousSummary
+					? `## Previous Context\n${previousSummary}\n\n`
+					: "";
+				summary = `${header}## Summary\n${llmResult}`;
+			} catch {
+				// Fallback to heuristic if LLM fails
+				summary = this.generateStructuredSummary(
+					compressible,
+					protectedMsgs,
+					previousSummary,
+				);
+			}
+		} else {
+			// Phase 2c: Standard heuristic structured summary
+			summary = this.generateStructuredSummary(
+				compressible,
+				protectedMsgs,
+				previousSummary,
+			);
+		}
 
 		// Phase 4: Calculate metrics
 		const tokensBefore = this.estimateTokens(messages);
@@ -702,7 +739,8 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Phase 3: Generate structured summary
+	 * Phase 3: Generate structured summary (compact format)
+	 * Uses terse headers, skips empty sections, and avoids extra whitespace.
 	 */
 	private generateStructuredSummary(
 		compressible: Message[],
@@ -724,47 +762,43 @@ export class UltraCompactEngine {
 		const nextSteps = this.extractNextSteps(allMessages);
 		const fileOps = this.extractFileOperations(allMessages);
 
+		// Compact goals section
 		if (goals.length > 0) {
-			sections.push("## Goals\n" + goals.map((g) => `- ${g}`).join("\n"));
+			sections.push("## Goals\n- " + goals.join(" / "));
 		}
 
+		// Compact decisions section
 		if (decisions.length > 0) {
-			sections.push(
-				"## Key Decisions\n" + decisions.map((d) => `- ${d}`).join("\n"),
-			);
+			sections.push("## Decisions\n- " + decisions.join(" / "));
 		}
 
+		// Compact errors & solutions section
 		if (errors.length > 0) {
-			sections.push(
-				"## Errors & Solutions\n" + errors.map((e) => `- ${e}`).join("\n"),
-			);
+			sections.push("## Errors\n- " + errors.join("\n- "));
 		}
 
+		// Compact file operations (single line with pipe separators)
 		if (fileOps.read.length > 0 || fileOps.modified.length > 0) {
-			sections.push("## File Operations");
+			const parts: string[] = [];
 			if (fileOps.read.length > 0) {
-				sections.push("Read:\n" + fileOps.read.map((f) => `- ${f}`).join("\n"));
+				parts.push("R: " + fileOps.read.join(", "));
 			}
 			if (fileOps.modified.length > 0) {
-				sections.push(
-					"Modified:\n" + fileOps.modified.map((f) => `- ${f}`).join("\n"),
-				);
+				parts.push("M: " + fileOps.modified.join(", "));
 			}
+			sections.push("## Files\n- " + parts.join(" | "));
 		}
 
+		// Compact next steps section
 		if (nextSteps.length > 0) {
-			sections.push(
-				"## Next Steps\n" +
-					nextSteps.map((s, i) => `${i + 1}. ${s}`).join("\n"),
-			);
+			sections.push("## Next\n- " + nextSteps.join(" → "));
 		}
 
-		// Compress remaining conversation
+		// Compact conversation summary
 		const compressedConversation = this.compressConversation(compressible);
-		// Always add conversation summary section if there are compressible messages
-		if (compressible.length > 0) {
+		if (compressible.length > 0 && compressedConversation) {
 			sections.push(
-				"## Conversation Summary" +
+				"## Chat" +
 					(compressedConversation ? "\n" + compressedConversation : ""),
 			);
 		}
@@ -1003,14 +1037,44 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Estimate token count (rough approximation)
+	 * Estimate token count with content-type awareness.
+	 *
+	 * Uses different ratios based on content structure:
+	 *   - Code blocks: ~3 chars/token (dense special characters)
+	 *   - Mixed/structured: ~4 chars/token
+	 *   - Plain prose: ~5 chars/token
+	 *   - Whitespace-heavy: ~6 chars/token (tool outputs, tables)
 	 */
 	private estimateTokens(messages: Message[]): number {
 		if (!Array.isArray(messages)) return 0;
 
 		let total = 0;
 		for (const msg of messages) {
-			total += Math.ceil(messageContent(msg).length / 4);
+			const text = messageContent(msg);
+			const len = text.length;
+			if (len === 0) continue;
+
+			// Detect code blocks
+			const codeBlockCount = (text.match(/```/g) || []).length;
+			const hasCodeBlocks = codeBlockCount > 1;
+
+			// Count non-whitespace characters
+			const nonSpace = text.replace(/\s/g, "").length;
+			const whitespaceRatio = nonSpace > 0 ? (len - nonSpace) / len : 0;
+
+			// Select chars-per-token ratio based on content type
+			let ratio: number;
+			if (hasCodeBlocks) {
+				ratio = 3.5; // Code is denser
+			} else if (whitespaceRatio > 0.3) {
+				ratio = 6; // Lots of whitespace (tables, logs)
+			} else if (nonSpace / len > 0.85) {
+				ratio = 3.5; // Dense text (code, keys)
+			} else {
+				ratio = 4.5; // Standard prose
+			}
+
+			total += Math.ceil(len / ratio);
 		}
 		return total;
 	}

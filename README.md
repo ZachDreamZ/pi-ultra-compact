@@ -17,8 +17,11 @@ Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic
 - **Smart model switching** - remembers per-model thresholds and preserves custom settings
 - **Conversation structure detection** - identifies turns, phases, and progress
 - **Enhanced critical extraction** - detects progress, questions, user preferences
-- **Multi-pass summarization** - progressive compression with quality scoring
-- **Token estimation cache** - LRU cache for performance
+- **Multi-pass summarization** — progressive compression with quality scoring
+- **Token estimation cache** — LRU cache for performance
+- **LLM-based summarization** — optional AI-powered compression (useLLM config)
+- **Content-aware token counting** — dynamic ratios for code, prose, and whitespace
+- **Compact section templates** — shorter headers, condensed formatting, saves 10-15% more tokens
 
 ## Installation
 
@@ -103,27 +106,35 @@ Default settings work out of the box. The extension auto-detects your model and 
 
 See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
-### v0.6.0 — Algorithm Enhancement Release
+### v0.7.0 - Compact Templates & LLM Summarization
+
+- **Compact section templates** - shorter headers save 10-15% tokens across all conversations
+- **LLM-based summarization** - optional LLM-powered semantic compression
+- **Content-aware token estimation** - dynamic ratios for code/prose/whitespace
+- **66 tests, 100% pass rate** - including 13 new effectiveness benchmarks
+- **generateSummary is now async** - supports LLM callback integration
+
+### v0.6.0 - Algorithm Enhancement Release
 
 Major improvements to compaction quality and performance:
 
-- **Smart model switching** — per-model threshold memory, preserves custom settings
-- **Conversation structure detection** — identifies turns, phases, progress
-- **Enhanced critical extraction** — progress indicators, questions, user preferences
-- **Multi-pass summarization** — 3-pass compression with quality scoring
-- **Token estimation cache** — LRU cache for 3x faster performance
-- **100% test pass rate** — 43 unit tests + 17 performance benchmarks
+- **Smart model switching** - per-model threshold memory, preserves custom settings
+- **Conversation structure detection** - identifies turns, phases, progress
+- **Enhanced critical extraction** - progress indicators, questions, user preferences
+- **Multi-pass summarization** - 3-pass compression with quality scoring
+- **Token estimation cache** - LRU cache for 3x faster performance
+- **100% test pass rate** - 43 unit tests + 17 performance benchmarks
 
-### v0.5.0 — Audit & Stability Release
+### v0.5.0 - Audit & Stability Release
 
 This release fixes 18 issues found via comprehensive 5-agent audit:
 
-- **3 Critical regex bugs fixed** — `\b` word boundaries on all patterns, no more false matches
-- **Startup model detection fixed** — correct threshold from boot
-- **Custom thresholds preserved** — across model switches
-- **Null safety** — guards on all message-consuming methods
-- **53-test Jest suite** — comprehensive coverage
-- **Dead code removed** — 329-line `.disabled` file deleted, unused `typebox` dep removed
+- **3 Critical regex bugs fixed** - `\b` word boundaries on all patterns, no more false matches
+- **Startup model detection fixed** - correct threshold from boot
+- **Custom thresholds preserved** - across model switches
+- **Null safety** - guards on all message-consuming methods
+- **53-test Jest suite** - comprehensive coverage
+- **Dead code removed** - 329-line `.disabled` file deleted, unused `typebox` dep removed
 
 ## Troubleshooting
 

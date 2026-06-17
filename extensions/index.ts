@@ -98,7 +98,7 @@ function handleUltracompactCommand(
 function handleBeforeCompact(
 	engine: UltraCompactEngine,
 ): (event: any, ctx: any) => Record<string, any> | undefined {
-	return (event: any, ctx: any) => {
+	return async (event: any, ctx: any) => {
 		// Capture model from ctx at runtime for maximum accuracy.
 		// handleBeforeCompact fires after model_select has already updated currentModel,
 		// so the separate reconfigureEngineForCurrentModel() call was redundant.
@@ -133,7 +133,7 @@ function handleBeforeCompact(
 		}
 
 		try {
-			const result = engine.generateSummary(
+			const result = await engine.generateSummary(
 				preparation.messagesToSummarize,
 				preparation.previousSummary,
 			);

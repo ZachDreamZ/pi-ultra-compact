@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-17
+
+### Added
+
+- **Compact section templates** — restructured summary sections use shorter headers (`## Decisions` instead of `## Key Decisions`, `## Errors` instead of `## Errors & Solutions`, `## Files` instead of `## File Operations`, `## Next` instead of `## Next Steps`)
+- **Compact file operations** — file ops displayed in compact pipe-separated format (`R: file1.ts | M: file2.ts`) instead of multi-line bullet lists
+- **Content-aware token estimation** — `estimateTokens()` now uses dynamic ratios based on content type: code blocks (3.5 chars/token), dense text (3.5), standard prose (4.5), whitespace-heavy (6)
+- **LLM-based summarization** — optional `useLLM` + `llmSummarize` config for AI-powered semantic summarization, with graceful heuristic fallback
+- **`minMessagesForCompression` config** — optional threshold to skip structured summary for very small conversations
+- **Logger utility** — added structured `logger.ts` for consistent error logging in the extension
+- **Effectiveness test suite** — 13 new tests covering compression ratios, critical info preservation, and deduplication
+
+### Changed
+
+- **generateSummary is now async** — supports optional LLM summarization callback
+- **Index.ts handler is now async** — `handleBeforeCompact` uses `await` for `generateSummary`
+- **Compact section format** — Goals and Decisions sections use condensed `/` separator instead of multi-line bullets
+- **Token estimation accuracy** — improved across all content types
+
+### Fixed
+
+- **All 53 original tests still pass** (after async migration)
+- **All 13 new effectiveness tests pass** (66 total)
+
 ## [0.6.0] - 2026-06-16
 
 ### Added

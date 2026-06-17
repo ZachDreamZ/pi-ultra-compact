@@ -14,6 +14,10 @@ export interface UltraCompactConfig {
 	autoCompact?: boolean;
 	/** Custom prompt for summarization */
 	customPrompt?: string;
+	/** Minimum messages required for structured summary (avoids bloat) */
+	minMessagesForCompression?: number;
+	/** Use Pi's model for smart LLM summarization (optional) */
+	useLLM?: boolean;
 }
 
 /** Result of a compaction operation */
