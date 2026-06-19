@@ -37,14 +37,12 @@
     "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",
-    "@types/jest": "^30.0.0",
-    "jest": "^30.4.2",
-    "ts-jest": "^29.4.11",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.6"
   },
   "scripts": {
     "build": "tsc",
-    "test": "jest",
+    "test": "vitest run --globals",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'Linting not configured yet'",
     "format": "echo 'Formatting not configured yet'"

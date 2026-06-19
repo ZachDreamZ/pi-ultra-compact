@@ -34,65 +34,7 @@ function messageContent(msg: Message): string {
 	return String(c ?? "");
 }
 
-/**
- * Comprehensive model context window sizes (in tokens)
- */
-const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-	// OpenAI
-	"gpt-5": 400000,
-	"gpt-5-pro": 400000,
-	"gpt-5-mini": 400000,
-	"gpt-5-nano": 400000,
-	"gpt-4.1": 1047576,
-	"gpt-4.1-mini": 1047576,
-	"gpt-4.1-nano": 1047576,
-	"gpt-4o": 128000,
-	"gpt-4o-mini": 128000,
-	"gpt-4-turbo": 128000,
-	o1: 200000,
-	"o1-mini": 128000,
-	"o1-pro": 200000,
-	o3: 200000,
-	"o3-mini": 200000,
-	"o4-mini": 200000,
-
-	// Anthropic
-	"claude-4.5-opus": 200000,
-	"claude-4.5-sonnet": 200000,
-	"claude-4.0-sonnet": 200000,
-	"claude-3.7-sonnet": 200000,
-	"claude-3.5-sonnet": 200000,
-	"claude-3-opus": 200000,
-	"claude-opus": 200000,
-	"claude-sonnet": 200000,
-
-	// Google
-	"gemini-2.5-pro": 1000000,
-	"gemini-2.5-flash": 1000000,
-	"gemini-2.0-flash": 1000000,
-	"gemini-1.5-pro": 2000000,
-	"gemini-1.5-flash": 1000000,
-
-	// DeepSeek
-	"deepseek-v4-pro": 1000000,
-	"deepseek-v4": 128000,
-	"deepseek-v3": 65536,
-	"deepseek-r1": 65536,
-
-	// Meta Llama
-	"llama-4-maverick": 1000000,
-	"llama-4-scout": 1000000,
-	"llama-3.3-70b": 128000,
-	"llama-3.1-405b": 128000,
-
-	// Mistral
-	"mistral-medium-3.5": 128000,
-	"mistral-large-3": 128000,
-	codestral: 256000,
-
-	// Default
-	default: 128000,
-};
+const DEFAULT_CONTEXT_WINDOW = 128000;
 
 /**
  * Importance signals for message scoring
@@ -171,6 +113,7 @@ export class UltraCompactEngine {
 		keepPercentage: number;
 		maxKeepTokens: number;
 		modelName?: string;
+		contextWindow?: number;
 		minMessagesForCompression: number;
 		useLLM: boolean;
 		/** Optional async LLM summarizer: receives conversation text, returns condensed summary */
@@ -201,6 +144,7 @@ export class UltraCompactEngine {
 			keepPercentage: config.keepPercentage ?? 0.3,
 			maxKeepTokens: config.maxKeepTokens ?? 30000,
 			modelName: config.modelName,
+			contextWindow: config.contextWindow,
 			minMessagesForCompression: config.minMessagesForCompression ?? 100,
 			useLLM: config.useLLM ?? false,
 			llmSummarize: config.llmSummarize,
@@ -217,7 +161,8 @@ export class UltraCompactEngine {
 			this.userThresholdOverride = config.thresholdTokens;
 		}
 
-		this.contextWindow = this.detectContextWindow(this.config.modelName);
+		this.contextWindow =
+			this.config.contextWindow ?? this.detectContextWindow(this.config.modelName);
 
 		if (this.userThresholdOverride === undefined) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
@@ -225,50 +170,19 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Detect context window size from model name
+	 * Return the generic fallback used only when Pi model metadata is unavailable.
 	 */
-	private detectContextWindow(modelName?: string): number {
-		if (!modelName) return MODEL_CONTEXT_WINDOWS["default"];
-
-		const normalized = modelName.toLowerCase();
-
-		if (Object.hasOwn(MODEL_CONTEXT_WINDOWS, normalized)) {
-			return MODEL_CONTEXT_WINDOWS[normalized];
-		}
-
-		for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
-			if (normalized.includes(key) || key.includes(normalized)) {
-				return value;
-			}
-		}
-
-		return this.detectFromFamily(normalized);
-	}
-
-	private detectFromFamily(normalized: string): number {
-		const familyDefaults: [string, number][] = [
-			["claude", 200000],
-			["gpt-4o", 128000],
-			["gpt-4", 8192],
-			["gemini", 1000000],
-			["deepseek", 128000],
-			["llama", 128000],
-			["mistral", 128000],
-		];
-
-		for (const [family, defaultWindow] of familyDefaults) {
-			if (normalized.includes(family)) return defaultWindow;
-		}
-
-		return MODEL_CONTEXT_WINDOWS["default"];
+	private detectContextWindow(_modelName?: string): number {
+		return DEFAULT_CONTEXT_WINDOW;
 	}
 
 	/**
 	 * Dynamically reconfigure the engine with a new model name
 	 */
-	public reconfigure(modelName?: string): void {
+	public reconfigure(modelName?: string, contextWindow?: number): void {
 		this.config.modelName = modelName;
-		this.contextWindow = this.detectContextWindow(modelName);
+		this.config.contextWindow = contextWindow;
+		this.contextWindow = contextWindow ?? this.detectContextWindow(modelName);
 		if (this.userThresholdOverride === undefined) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
 		}

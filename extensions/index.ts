@@ -11,7 +11,7 @@
 import { UltraCompactEngine } from "./engine";
 import type { UltraCompactConfig } from "./types";
 
-/** Track current model at runtime (updated by model_select event) */
+/** Track current model at runtime (updated by session_start and model_select events) */
 let currentModel: { id?: string; contextWindow?: number } | undefined;
 
 /** Default configuration — thresholdTokens omitted so engine auto-detects from model context window */
@@ -21,15 +21,31 @@ const DEFAULT_CONFIG: UltraCompactConfig = {
 	autoCompact: true,
 };
 
-/**
- * Attempt to extract model name from Pi context.
- * Tries multiple sources so model changes are reflected at runtime:
- * 1. pi.model (ExtensionAPI at init)
- * 2. currentModel (tracked via model_select event)
- * Falls back to undefined, letting the engine use a default context window.
- */
-function getModelName(): string | undefined {
-	return currentModel?.id || undefined;
+function captureModel(model: any): void {
+	if (!model) return;
+
+	const id =
+		typeof model === "string"
+			? model
+			: model.id || model.name || model.model || undefined;
+	const contextWindow =
+		typeof model === "object" && typeof model.contextWindow === "number"
+			? model.contextWindow
+			: undefined;
+
+	if (id || contextWindow) {
+		currentModel = { id, contextWindow };
+	}
+}
+
+function notify(
+	ctx: any,
+	message: string,
+	type: "info" | "warning" | "error" = "info",
+): void {
+	if (typeof ctx?.ui?.notify === "function") {
+		ctx.ui.notify(message, type);
+	}
 }
 
 /**
@@ -37,11 +53,7 @@ function getModelName(): string | undefined {
  * Ensures the threshold adapts even if the user changed models mid-session.
  */
 function reconfigureEngineForCurrentModel(engine: UltraCompactEngine): void {
-	let modelId: string | undefined;
-	if (currentModel?.id) {
-		modelId = currentModel.id;
-	}
-	engine.reconfigure(modelId);
+	engine.reconfigure(currentModel?.id, currentModel?.contextWindow);
 }
 
 /**
@@ -55,37 +67,20 @@ function handleUltracompactCommand(
 	return (_args: any, ctx: any) => {
 		// Guard against missing ctx or ctx.compact
 		if (typeof ctx?.compact !== "function") {
-			console.warn(
-				"[pi-ultra-compact] ctx.compact unavailable, cannot run /ultracompact",
-			);
+			notify(ctx, "Ultra-compact unavailable: ctx.compact is missing", "error");
 			return;
 		}
 
 		// Reconfigure engine to current model before compaction
 		reconfigureEngineForCurrentModel(engine);
 
-		if (typeof ctx.ui?.notify === "function") {
-			ctx.ui.notify("Starting ultra-compact compaction...", "info");
-		}
-
 		// Use Pi's built-in compact() API with a marker so our
 		// session_before_compact hook applies ultra-compact logic
 		ctx.compact({
 			customInstructions: "ultracompact",
-			onComplete: () => {
-				if (typeof ctx.ui?.notify === "function") {
-					ctx.ui.notify("Ultra-compact compaction complete!", "success");
-				}
-			},
+			onComplete: () => {},
 			onError: (error: Error) => {
-				if (typeof ctx.ui?.notify === "function") {
-					ctx.ui.notify(`Ultra-compact failed: ${error.message}`, "error");
-				} else {
-					console.error(
-						"[pi-ultra-compact] Ultra-compact failed:",
-						error.message,
-					);
-				}
+				notify(ctx, `Ultra-compact failed: ${error.message}`, "error");
 			},
 		});
 	};
@@ -116,27 +111,23 @@ function handleBeforeCompact(
 		if (breakerTrippedAtTurn !== null) {
 			const COOLDOWN_TURNS = engine["config"]?.circuitBreakerCooldown ?? 5;
 			if (currentTurn - breakerTrippedAtTurn < COOLDOWN_TURNS) {
-				console.warn(
-					`[pi-ultra-compact] Circuit breaker open (turn ${currentTurn}), using default compaction`,
+				notify(
+					ctx,
+					"Ultra-compact circuit breaker open; using default compaction",
+					"warning",
 				);
 				return undefined; // Fall back to Pi default
 			}
 			// Cool-down expired, reset breaker
 			compactionFailures = 0;
 			breakerTrippedAtTurn = null;
-			console.log("[pi-ultra-compact] Circuit breaker reset");
 		}
 
 		// Capture model from ctx at runtime
-		if (ctx?.model?.id && ctx.model.id !== currentModel?.id) {
-			currentModel = {
-				id: ctx.model.id,
-				contextWindow: ctx.model.contextWindow,
-			};
-			engine.reconfigure(ctx.model.id);
-		} else if (currentModel?.id) {
-			engine.reconfigure(currentModel.id);
+		if (ctx?.model) {
+			captureModel(ctx.model);
 		}
+		reconfigureEngineForCurrentModel(engine);
 
 		const preparation = event?.preparation;
 		if (!preparation) {
@@ -161,21 +152,6 @@ function handleBeforeCompact(
 
 		if (!isManual && !engine.shouldCompact(effectiveTokens)) {
 			return undefined; // No compaction needed
-		}
-
-		const tier = isManual
-			? ("full" as const)
-			: engine["config"]?.cacheAware
-				? ("auto" as const)
-				: ("full" as const);
-
-		if (typeof ctx.ui?.notify === "function") {
-			ctx.ui.notify(
-				tier === "auto" && engine.determineTier(messagesToCompact) === 1
-					? `Ultra-compact micro compacting ${currentTokens.toLocaleString()} tokens…`
-					: `Ultra-compact threshold reached (${currentTokens.toLocaleString()}), compacting…`,
-				"info",
-			);
 		}
 
 		// ── Snapshot ────────────────────────────────────────────────────
@@ -257,17 +233,20 @@ function handleBeforeCompact(
 		} catch (error) {
 			// ── Circuit breaker ─────────────────────────────────────────
 			compactionFailures++;
-			console.error(
-				`[pi-ultra-compact] Compaction failed (${compactionFailures}/${engine["config"]?.circuitBreakerMaxFailures ?? 3}):`,
-				error,
+			notify(
+				ctx,
+				`Ultra-compact failed (${compactionFailures}/${engine["config"]?.circuitBreakerMaxFailures ?? 3})`,
+				"warning",
 			);
 
 			if (
 				compactionFailures >= (engine["config"]?.circuitBreakerMaxFailures ?? 3)
 			) {
 				breakerTrippedAtTurn = currentTurn;
-				console.error(
-					"[pi-ultra-compact] Circuit breaker tripped! Using lossy truncation.",
+				notify(
+					ctx,
+					"Ultra-compact circuit breaker tripped; emergency truncation applied",
+					"error",
 				);
 
 				// ── Lossy truncation (last resort) ──────────────────────
@@ -292,13 +271,6 @@ function handleBeforeCompact(
 					.filter(Boolean)
 					.join("\n");
 
-				if (typeof ctx.ui?.notify === "function") {
-					ctx.ui.notify(
-						"Compaction failed repeatedly — emergency truncation applied",
-						"warning",
-					);
-				}
-
 				return {
 					compaction: {
 						summary: lossySummary,
@@ -318,23 +290,6 @@ function handleBeforeCompact(
 	};
 }
 
-function logModelInfo(
-	engine: UltraCompactEngine,
-	config: UltraCompactConfig,
-): void {
-	const recommendations = engine.getModelRecommendations();
-	console.log(
-		`[pi-ultra-compact] Detected model family: ${recommendations.modelFamily}`,
-	);
-	console.log(
-		`[pi-ultra-compact] Context window: ${recommendations.contextWindow.toLocaleString()} tokens`,
-	);
-	const threshold =
-		config.thresholdTokens?.toLocaleString() ||
-		Math.floor(recommendations.contextWindow * 0.8).toLocaleString();
-	console.log(`[pi-ultra-compact] Auto-compact threshold: ${threshold} tokens`);
-}
-
 /**
  * Pi extension factory function
  */
@@ -344,32 +299,15 @@ export default function piUltraCompact(
 ): void {
 	const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
-	// Capture model from pi at init-time BEFORE engine construction
-	// so threshold auto-detection uses the correct context window from the start
-	if (pi?.model) {
-		currentModel = {
-			id: pi.model,
-			contextWindow: undefined,
-		};
-	}
-
-	// Try to get model name from Pi context (init-time, updated at runtime via model_select)
-	const modelName = getModelName();
-
 	const engine = new UltraCompactEngine({
 		...mergedConfig,
-		modelName,
 	});
-
-	// Log model detection (now may show correct model at startup)
-	logModelInfo(engine, mergedConfig);
 
 	// Guard: ensure required Pi APIs are available
 	if (typeof pi?.registerCommand !== "function") {
-		console.error(
-			"[pi-ultra-compact] pi.registerCommand is unavailable — extension cannot register commands",
+		throw new Error(
+			"pi-ultra-compact requires pi.registerCommand to register /ultracompact",
 		);
-		return;
 	}
 
 	// Register /ultracompact command
@@ -381,15 +319,15 @@ export default function piUltraCompact(
 
 	// Track model changes at runtime so compaction adapts when user switches models
 	if (typeof pi.on === "function") {
+		pi.on("session_start", (_event: any, ctx: any) => {
+			captureModel(ctx?.model);
+			reconfigureEngineForCurrentModel(engine);
+		});
+
 		pi.on("model_select", (event: any, _ctx: any) => {
 			if (event?.model) {
-				currentModel = {
-					id: event.model.id || event.model.name,
-					contextWindow: event.model.contextWindow,
-				};
-				console.log(
-					`[pi-ultra-compact] Model updated: ${currentModel.id} (${currentModel.contextWindow?.toLocaleString() ?? "unknown"} context)`,
-				);
+				captureModel(event.model);
+				reconfigureEngineForCurrentModel(engine);
 			}
 		});
 	}
@@ -398,18 +336,6 @@ export default function piUltraCompact(
 	if (mergedConfig.autoCompact) {
 		pi.on("session_before_compact", handleBeforeCompact(engine));
 	}
-
-	// Log initialization
-	console.log("[pi-ultra-compact] Extension loaded");
-	console.log(
-		`  Threshold: ${engine.shouldCompactDefaultThreshold().toLocaleString()} tokens (model: ${engine.getContextWindow().toLocaleString()})`,
-	);
-	console.log(
-		`  Keep percentage: ${(mergedConfig.keepPercentage ?? 0.3) * 100}%`,
-	);
-	console.log(
-		`  Auto-compact: ${mergedConfig.autoCompact ? "enabled" : "disabled"}`,
-	);
 }
 
 // Export engine for programmatic use

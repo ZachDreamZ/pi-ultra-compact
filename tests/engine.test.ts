@@ -54,9 +54,18 @@ describe("UltraCompactEngine", () => {
 			expect(engine.calculateKeepTokens(1000)).toBe(50);
 		});
 
-		it("accepts modelName for context detection", async () => {
+		it("uses generic default when only modelName is provided", async () => {
 			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
+			expect(engine.getContextWindow()).toBe(128000);
+		});
+
+		it("accepts explicit contextWindow from Pi model metadata", async () => {
+			const engine = new UltraCompactEngine({
+				modelName: "claude-sonnet",
+				contextWindow: 200000,
+			});
 			expect(engine.getContextWindow()).toBe(200000);
+			expect(engine.shouldCompactDefaultThreshold()).toBe(160000);
 		});
 
 		it("uses 128000 default for unknown models", async () => {
@@ -67,56 +76,40 @@ describe("UltraCompactEngine", () => {
 		});
 	});
 
-	// ─── detectContextWindow (tested via constructor/reconfigure) ──
+	// ─── contextWindow fallback (tested via constructor/reconfigure) ──
 
-	describe("context window detection", () => {
-		it("detects gpt-5", async () => {
+	describe("context window fallback", () => {
+		it("uses the generic fallback for known model names without Pi metadata", async () => {
 			const e = new UltraCompactEngine({ modelName: "gpt-5" });
-			expect(e.getContextWindow()).toBe(400000);
+			expect(e.getContextWindow()).toBe(128000);
 		});
 
-		it("detects claude-4.5-opus", async () => {
-			const e = new UltraCompactEngine({ modelName: "claude-4.5-opus" });
-			expect(e.getContextWindow()).toBe(200000);
-		});
-
-		it("detects gemini-2.5-pro", async () => {
-			const e = new UltraCompactEngine({ modelName: "gemini-2.5-pro" });
-			expect(e.getContextWindow()).toBe(1000000);
-		});
-
-		it("detects deepseek-v4-pro", async () => {
-			const e = new UltraCompactEngine({ modelName: "deepseek-v4-pro" });
-			expect(e.getContextWindow()).toBe(1000000);
-		});
-
-		it("detects llama-4-maverick", async () => {
-			const e = new UltraCompactEngine({ modelName: "llama-4-maverick" });
-			expect(e.getContextWindow()).toBe(1000000);
-		});
-
-		it("falls back to family defaults for partial names", async () => {
-			const e = new UltraCompactEngine({ modelName: "claude-9999-super" });
-			expect(e.getContextWindow()).toBe(200000);
+		it("uses explicit contextWindow instead of model-name lookup", async () => {
+			const e = new UltraCompactEngine({
+				modelName: "gpt-5",
+				contextWindow: 272000,
+			});
+			expect(e.getContextWindow()).toBe(272000);
 		});
 	});
 
 	// ─── reconfigure ──────────────────────────────────────────────
 
 	describe("reconfigure", () => {
-		it("updates context window for new model", async () => {
+		it("updates context window from explicit Pi metadata", async () => {
 			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
-			expect(engine.getContextWindow()).toBe(200000);
-			engine.reconfigure("gpt-4o");
 			expect(engine.getContextWindow()).toBe(128000);
+			engine.reconfigure("gpt-4o", 272000);
+			expect(engine.getContextWindow()).toBe(272000);
 		});
 
-		it("updates threshold for new model", async () => {
+		it("updates threshold for explicit Pi metadata", async () => {
 			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
 			const before = engine.shouldCompactDefaultThreshold();
-			engine.reconfigure("gpt-4o");
+			engine.reconfigure("gpt-4o", 272000);
 			const after = engine.shouldCompactDefaultThreshold();
 			expect(after).not.toBe(before);
+			expect(after).toBe(217600);
 		});
 
 		it("handles undefined model name", async () => {
