@@ -206,10 +206,20 @@ function handleBeforeCompact(
 			) {
 				// Micro-compaction: no LLM, just strip tool outputs
 				const micro = engine.microCompact(messagesToCompact);
+				const extractMicroContent = (m: any): string => {
+					if (typeof m.content === "string") return m.content;
+					if (Array.isArray(m.content)) {
+						return m.content
+							.filter((b: any) => b?.type === "text")
+							.map((b: any) => b.text ?? "")
+							.join(" ");
+					}
+					return String(m.content ?? "");
+				};
 				const conversationText = micro.messages
 					.map(
 						(m: any) =>
-							`[${m.role}]: ${typeof m.content === "string" ? m.content.substring(0, 200) : ""}`,
+							`[${m.role}]: ${extractMicroContent(m).substring(0, 200)}`,
 					)
 					.join("\n");
 				result = {

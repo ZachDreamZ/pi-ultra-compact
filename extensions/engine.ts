@@ -322,7 +322,10 @@ export class UltraCompactEngine {
 	 * Get the effective threshold used by shouldCompact
 	 */
 	public shouldCompactDefaultThreshold(): number {
-		return this.config.thresholdTokens;
+		const watermarkThreshold = Math.floor(
+			this.contextWindow * this.config.preemptiveWatermark,
+		);
+		return Math.min(this.config.thresholdTokens, watermarkThreshold);
 	}
 
 	/**
@@ -784,7 +787,7 @@ export class UltraCompactEngine {
 		// Protect recent messages by token budget (scale with context window, min 5K, max 50K)
 		const recentBudget = Math.max(
 			5000,
-			Math.min(50000, Math.floor(this.contextWindow * 0.1)),
+			Math.min(50000, Math.floor(this.contextWindow * 0.15)),
 		);
 		const recentProtected = this.protectRecentByTokenBudget(
 			compressible,
