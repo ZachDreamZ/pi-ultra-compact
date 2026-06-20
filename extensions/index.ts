@@ -10,6 +10,7 @@
 
 import { UltraCompactEngine } from "./engine";
 import type { UltraCompactConfig } from "./types";
+import { CompactionTier } from "./types";
 
 /** Track current model at runtime (updated by model_select event) */
 let currentModel: { id?: string; contextWindow?: number } | undefined;
@@ -171,7 +172,7 @@ function handleBeforeCompact(
 
 		if (typeof ctx.ui?.notify === "function") {
 			ctx.ui.notify(
-				tier === "auto" && engine.determineTier(messagesToCompact) === 1
+				tier === "auto" && engine.determineTier(messagesToCompact) === CompactionTier.MICRO
 					? `Ultra-compact micro compacting ${currentTokens.toLocaleString()} tokens…`
 					: `Ultra-compact threshold reached (${currentTokens.toLocaleString()}), compacting…`,
 				"info",
@@ -201,7 +202,7 @@ function handleBeforeCompact(
 
 			if (
 				!isManual &&
-				engine.determineTier(messagesToCompact) === 1 // MICRO
+				engine.determineTier(messagesToCompact) === CompactionTier.MICRO
 			) {
 				// Micro-compaction: no LLM, just strip tool outputs
 				const micro = engine.microCompact(messagesToCompact);
@@ -276,17 +277,30 @@ function handleBeforeCompact(
 				const nonSystem = snapshot.filter((m: any) => m.role !== "system");
 				const tail = nonSystem.slice(-tailKeep);
 
+				const extractContent = (m: any): string => {
+					if (typeof m.content === "string") return m.content;
+					if (Array.isArray(m.content)) {
+						return m.content
+							.filter((b: any) => b?.type === "text")
+							.map((b: any) => b.text ?? "")
+							.join(" ");
+					}
+					return String(m.content ?? "");
+				};
+
 				const lossySummary = [
 					...system.map(
 						(m: any) =>
-							`[System]: ${typeof m.content === "string" ? m.content : ""}`,
+							`[System]: ${extractContent(m)}`,
 					),
 					"",
 					"[earlier history truncated — circuit breaker engaged]",
 					"",
 					...tail.map(
-						(m: any) =>
-							`${typeof m.content === "string" ? `[${m.role}]: ${m.content.substring(0, 500)}` : ""}`,
+						(m: any) => {
+							const text = extractContent(m);
+							return text ? `[${m.role}]: ${text.substring(0, 500)}` : "";
+						},
 					),
 				]
 					.filter(Boolean)
