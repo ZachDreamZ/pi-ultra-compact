@@ -77,13 +77,14 @@ function handleUltracompactCommand(
 					ctx.ui.notify("Ultra-compact compaction complete!", "success");
 				}
 			},
-			onError: (error: Error) => {
+			onError: (error: unknown) => {
+				const errMsg = error instanceof Error ? error.message : String(error);
 				if (typeof ctx.ui?.notify === "function") {
-					ctx.ui.notify(`Ultra-compact failed: ${error.message}`, "error");
+					ctx.ui.notify(`Ultra-compact failed: ${errMsg}`, "error");
 				} else {
 					console.error(
 						"[pi-ultra-compact] Ultra-compact failed:",
-						error.message,
+						errMsg,
 					);
 				}
 			},
@@ -144,10 +145,20 @@ function handleBeforeCompact(
 		}
 
 		const currentTokens = preparation.tokensBefore;
+		if (typeof currentTokens !== "number" || !isFinite(currentTokens) || currentTokens < 0) {
+			console.warn("[pi-ultra-compact] Invalid tokensBefore in preparation, skipping compaction");
+			return undefined;
+		}
+
 		const messagesToCompact = preparation.messagesToSummarize;
 		const isManual = event?.customInstructions === "ultracompact";
 
 		if (!Array.isArray(messagesToCompact) || messagesToCompact.length === 0) {
+			return undefined;
+		}
+
+		if (typeof preparation.firstKeptEntryId !== "string" && preparation.firstKeptEntryId !== undefined) {
+			console.warn("[pi-ultra-compact] Invalid firstKeptEntryId in preparation, skipping compaction");
 			return undefined;
 		}
 
@@ -382,10 +393,14 @@ export default function piUltraCompact(
 	// Track model changes at runtime so compaction adapts when user switches models
 	if (typeof pi.on === "function") {
 		pi.on("model_select", (event: any, _ctx: any) => {
-			if (event?.model) {
+			if (event?.model && typeof event.model === "object") {
+				const modelId = typeof event.model.id === "string" ? event.model.id
+					: typeof event.model.name === "string" ? event.model.name
+					: undefined;
+				if (!modelId) return;
 				currentModel = {
-					id: event.model.id || event.model.name,
-					contextWindow: event.model.contextWindow,
+					id: modelId,
+					contextWindow: typeof event.model.contextWindow === "number" ? event.model.contextWindow : undefined,
 				};
 				console.log(
 					`[pi-ultra-compact] Model updated: ${currentModel.id} (${currentModel.contextWindow?.toLocaleString() ?? "unknown"} context)`,
