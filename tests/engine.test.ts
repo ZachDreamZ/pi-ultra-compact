@@ -1,24 +1,6 @@
 import { UltraCompactEngine } from "../extensions/engine";
 import type { Message } from "../extensions/types";
-
-/** Helper to create a message */
-function makeMsg(id: string, role: string, content: string): Message {
-	return { id, role: role as any, content, timestamp: Date.now() };
-}
-
-/** Helper to create a message with structured content */
-function makeStructuredMsg(
-	id: string,
-	role: string,
-	blocks: { type: string; text?: string }[],
-): Message {
-	return {
-		id,
-		role: role as any,
-		content: blocks as any,
-		timestamp: Date.now(),
-	};
-}
+import { makeMsg, makeStructuredMsg } from "./helpers";
 
 describe("UltraCompactEngine", () => {
 	// ─── Constructor ───────────────────────────────────────────────

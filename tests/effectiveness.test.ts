@@ -7,31 +7,8 @@
 
 import { UltraCompactEngine } from "../extensions/engine";
 import type { Message } from "../extensions/types/index";
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function makeMsg(overrides: Partial<Message> & { content: string }): Message {
-	return {
-		id: `msg-${Math.random().toString(36).slice(2, 8)}`,
-		role: "user",
-		timestamp: Date.now(),
-		...overrides,
-	};
-}
-
-function messageContent(msg: Message): string {
-	const c = msg.content;
-	if (typeof c === "string") return c;
-	if (Array.isArray(c)) {
-		return c
-			.filter((block: any) => block?.type === "text")
-			.map((block: any) => block.text ?? "")
-			.join(" ");
-	}
-	return String(c ?? "");
-}
+import { makeMsgFrom } from "./helpers";
+import { messageContent } from "../extensions/utils";
 
 function generateConversation(size: number): Message[] {
 	const msgs: Message[] = [];
@@ -110,7 +87,7 @@ function generateConversation(size: number): Message[] {
 			content += "\nNEXT: Run the full test suite.";
 		}
 
-		msgs.push(makeMsg({ role, content }));
+		msgs.push(makeMsgFrom({ role, content }));
 	}
 
 	return msgs;
@@ -223,11 +200,11 @@ describe("UltraCompactEngine Effectiveness", () => {
 
 	test("deduplication preserves critical info after removing duplicates", async () => {
 		const dupMsgs = [
-			makeMsg({ role: "user", content: "fix the bug" }),
-			makeMsg({ role: "user", content: "GOAL: complete the audit" }),
-			makeMsg({ role: "user", content: "fix the bug" }),
-			makeMsg({ role: "user", content: "GOAL: complete the audit" }),
-			makeMsg({ role: "user", content: "ERROR: test failure" }),
+			makeMsgFrom({ role: "user", content: "fix the bug" }),
+			makeMsgFrom({ role: "user", content: "GOAL: complete the audit" }),
+			makeMsgFrom({ role: "user", content: "fix the bug" }),
+			makeMsgFrom({ role: "user", content: "GOAL: complete the audit" }),
+			makeMsgFrom({ role: "user", content: "ERROR: test failure" }),
 		];
 		const result = await engine.generateSummary(dupMsgs);
 		expect(result.summary).toContain("complete the audit");
@@ -240,9 +217,9 @@ describe("UltraCompactEngine Effectiveness", () => {
 
 	test("extractCriticalInfo identifies important messages", async () => {
 		const infoMsgs = [
-			makeMsg({ role: "user", content: "GOAL: fix all bugs" }),
-			makeMsg({ role: "user", content: "just a normal message" }),
-			makeMsg({ role: "user", content: "ERROR: crash in parser" }),
+			makeMsgFrom({ role: "user", content: "GOAL: fix all bugs" }),
+			makeMsgFrom({ role: "user", content: "just a normal message" }),
+			makeMsgFrom({ role: "user", content: "ERROR: crash in parser" }),
 		];
 		const { critical, compressible } = engine.extractCriticalInfo(infoMsgs);
 		expect(critical.some((m) => messageContent(m).includes("GOAL"))).toBe(true);
