@@ -9,8 +9,10 @@ describe("UltraCompactEngine", () => {
 		it("uses default config when no args", async () => {
 			const engine = new UltraCompactEngine();
 			expect(engine.getContextWindow()).toBe(128000);
+			// Effective threshold = min(thresholdTokens, preemptiveWatermark * contextWindow)
+			// = min(128000*0.8, 128000*0.7) = min(102400, 89600) = 89600
 			expect(engine.shouldCompactDefaultThreshold()).toBe(
-				Math.floor(128000 * 0.8),
+				Math.floor(128000 * 0.7),
 			);
 		});
 

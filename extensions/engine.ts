@@ -278,7 +278,10 @@ export class UltraCompactEngine {
 	 * Get the effective threshold used by shouldCompact
 	 */
 	public shouldCompactDefaultThreshold(): number {
-		return this.config.thresholdTokens;
+		const watermarkThreshold = Math.floor(
+			this.contextWindow * this.config.preemptiveWatermark,
+		);
+		return Math.min(this.config.thresholdTokens, watermarkThreshold);
 	}
 
 	/**
@@ -342,8 +345,8 @@ export class UltraCompactEngine {
 		const tokens = this.estimateTokens(messages);
 		const ratio = this.contextWindow > 0 ? tokens / this.contextWindow : 0;
 
-		if (ratio >= 0.9) return CompactionTier.FULL;
-		if (ratio >= 0.6) return CompactionTier.MICRO;
+		if (ratio >= this.config.hardWatermark) return CompactionTier.FULL;
+		if (ratio >= this.config.preemptiveWatermark) return CompactionTier.MICRO;
 		return CompactionTier.NONE;
 	}
 
@@ -412,10 +415,19 @@ export class UltraCompactEngine {
 
 	/**
 	 * Check if compaction is needed based on token count.
-	 * Returns true at 60%+ usage (lower threshold for micro-compact).
+	 * Uses configured preemptiveWatermark (default 0.7) as the trigger level,
+	 * falling back to the user-configured thresholdTokens if lower.
 	 */
 	public shouldCompact(currentTokens: number): boolean {
-		return currentTokens >= Math.floor(this.contextWindow * 0.6);
+		const watermarkThreshold = Math.floor(
+			this.contextWindow * this.config.preemptiveWatermark,
+		);
+		// Use the lower of configured threshold and watermark-based threshold
+		const effectiveThreshold = Math.min(
+			this.config.thresholdTokens,
+			watermarkThreshold,
+		);
+		return currentTokens >= effectiveThreshold;
 	}
 
 	public async generateSummary(
@@ -720,10 +732,14 @@ export class UltraCompactEngine {
 			compressible.push(msg);
 		}
 
-		// Protect recent messages by token budget
+		// Protect recent messages by token budget (scale with context window, min 5K, max 50K)
+		const recentBudget = Math.max(
+			5000,
+			Math.min(50000, Math.floor(this.contextWindow * 0.15)),
+		);
 		const recentProtected = this.protectRecentByTokenBudget(
 			compressible,
-			20000,
+			recentBudget,
 		);
 		const remainingCompressible = compressible.filter(
 			(msg) => !recentProtected.includes(msg),
@@ -986,14 +1002,14 @@ export class UltraCompactEngine {
 
 		// Keep removing from oldest until budget is satisfied
 		const result = [...protectedMsgs];
-		const initialTokens = this.estimateTokens(result);
+		let runningTokens = this.estimateTokens(result);
 
 		// Add back candidates from newest to oldest while staying under budget
 		for (let i = candidates.length - 1; i >= 0; i--) {
 			const candidateTokens = this.estimateTokens([candidates[i]]);
-			if (initialTokens + candidateTokens <= tokenBudget) {
+			if (runningTokens + candidateTokens <= tokenBudget) {
 				result.push(candidates[i]);
-				// Need to re-check budget with newly added message
+				runningTokens += candidateTokens;
 			}
 		}
 
@@ -1260,7 +1276,7 @@ export class UltraCompactEngine {
 	 */
 	private extractTopic(content: string): string {
 		const cleanContent = content.replace(/```[\s\S]*?```/g, "");
-		const topicMatch = cleanContent.match(/(?:TOPIC|SUBJECT|ABOUT):?\s*(.+)/i);
+		const topicMatch = cleanContent.match(/\b(?:TOPIC|SUBJECT|ABOUT)\b:?\s*(.+)/i);
 		if (topicMatch) return topicMatch[1].trim();
 
 		const firstSentence = cleanContent.split(/[.!?]/)[0];
