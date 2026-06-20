@@ -430,3 +430,4 @@ export default function piUltraCompact(
 // Export engine for programmatic use
 export { UltraCompactEngine } from "./engine";
 export type { UltraCompactConfig, CompactionResult } from "./types";
+export { messageContent } from "./utils";

@@ -18,21 +18,13 @@ import type {
 	MicroCompactStats,
 } from "./types";
 import { EvictionLevel, CompactionTier } from "./types";
-
-/**
- * Normalize message content to string, handling both plain text and structured arrays.
- */
-function messageContent(msg: Message): string {
-	const c = msg.content;
-	if (typeof c === "string") return c;
-	if (Array.isArray(c)) {
-		return c
-			.filter((block: any): boolean => block?.type === "text")
-			.map((block: any): string => block.text ?? "")
-			.join(" ");
-	}
-	return String(c ?? "");
-}
+import {
+	messageContent,
+	KEYWORD_PATTERNS,
+	extractByPattern,
+	containsErrorIndicators,
+	emptyCompactionResult,
+} from "./utils";
 
 /**
  * Comprehensive model context window sizes (in tokens)
@@ -95,54 +87,18 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 };
 
 /**
- * Importance signals for message scoring
+ * Importance signals for message scoring.
+ * Keyword patterns are sourced from KEYWORD_PATTERNS (shared with extract* utilities).
  */
 const IMPORTANCE_SIGNALS = {
-	// Keyword patterns with weights
-	keywords: [
-		{
-			pattern: /\b(?:GOAL|OBJECTIVE|TARGET|WANT TO|TRYING TO)\b:?\s*(.+)/i,
-			weight: 1.0,
-		},
-		{
-			pattern: /\b(?:DECISION|DECIDED|CHOSE|SELECTED)\b:?\s*(.+)/i,
-			weight: 0.95,
-		},
-		{
-			pattern: /\b(?:ERROR|FAILED|BUG|ISSUE|PROBLEM|CRASH)\b:?\s*(.+)/i,
-			weight: 0.9,
-		},
-		{
-			pattern: /\b(?:SOLUTION|FIX|RESOLVED|FIXED|WORKAROUND)\b:?\s*(.+)/i,
-			weight: 0.85,
-		},
-		{
-			pattern: /\b(?:DISCOVERED|FOUND|LEARNED|INSIGHT|REALIZED)\b:?\s*(.+)/i,
-			weight: 0.8,
-		},
-		{
-			pattern: /\b(?:CONSTRAINT|REQUIREMENT|REQUIRED|MUST)\b:?\s*(.+)/i,
-			weight: 0.75,
-		},
-		{ pattern: /\b(?:FILE|PATH|DIRECTORY|MODULE)\b:?\s*(.+)/i, weight: 0.7 },
-		{
-			pattern:
-				/\b(?:ADDED|REMOVED|MODIFIED|CHANGED|UPDATED|CREATED|DELETED)\b:?\s*(.+)/i,
-			weight: 0.65,
-		},
-		{
-			pattern: /\b(?:TODO|NEXT|SHOULD|PLAN TO|NEED TO)\b:?\s*(.+)/i,
-			weight: 0.6,
-		},
-	],
+	keywords: Object.values(KEYWORD_PATTERNS),
 
-	// Content type multipliers
 	contentMultipliers: {
-		codeBlock: 1.3, // Code is hard to reconstruct
-		filePath: 1.2, // Files track project state
-		toolCall: 1.15, // Actions contain key state
-		errorLog: 1.25, // Errors need tracking
-		multiLine: 0.9, // Long messages slightly less important
+		codeBlock: 1.3,
+		filePath: 1.2,
+		toolCall: 1.15,
+		errorLog: 1.25,
+		multiLine: 0.9,
 	},
 };
 
@@ -467,15 +423,7 @@ export class UltraCompactEngine {
 		previousSummary?: string,
 	): Promise<CompactionResult> {
 		if (!Array.isArray(messages) || messages.length === 0) {
-			return {
-				summary: previousSummary || "",
-				tokensBefore: 0,
-				tokensAfter: 0,
-				compressionRatio: 1,
-				readFiles: [],
-				modifiedFiles: [],
-				timestamp: Date.now(),
-			};
+			return emptyCompactionResult(previousSummary);
 		}
 
 		// Phase 1: Pre-processing (no LLM)
@@ -884,82 +832,47 @@ export class UltraCompactEngine {
 
 		let totalStripped = 0;
 
-		// ── Level 1: Strip reasoning blocks from assistant messages ──────────
-		if (maxLevel >= EvictionLevel.STRIP_REASONING) {
+		const evictionSteps: Array<{
+			level: EvictionLevel;
+			apply: (msgs: Message[]) => Message[];
+		}> = [
+			{
+				level: EvictionLevel.STRIP_REASONING,
+				apply: (msgs) => this.stripReasoningBlocks(msgs),
+			},
+			{
+				level: EvictionLevel.STRIP_BULK_OUTPUT,
+				apply: (msgs) => this.stripBulkToolOutputs(msgs),
+			},
+			{
+				level: EvictionLevel.STRIP_ARTIFACTS,
+				apply: (msgs) => this.stripArtifactToolOutputs(msgs),
+			},
+			{
+				level: EvictionLevel.FULL_REMOVAL,
+				apply: (msgs) => this.removeOldCompressibleMessages(msgs, tokenBudget),
+			},
+		];
+
+		for (const step of evictionSteps) {
+			if (maxLevel < step.level) break;
+
 			const before = this.estimateTokens(current);
-			current = this.stripReasoningBlocks(current);
+			current = step.apply(current);
 			const after = this.estimateTokens(current);
 			const saved = before - after;
 			totalStripped += saved;
 
-			if (after <= tokenBudget) {
+			if (after <= tokenBudget || step.level === EvictionLevel.FULL_REMOVAL) {
 				return {
 					messages: current,
 					stats: {
 						messagesStripped: saved,
 						tokensSaved: saved,
-						levelUsed: EvictionLevel.STRIP_REASONING,
+						levelUsed: step.level,
 					},
 				};
 			}
-		}
-
-		// ── Level 2: Strip bulk tool outputs (>100 lines, >5000 chars) ──────
-		if (maxLevel >= EvictionLevel.STRIP_BULK_OUTPUT) {
-			const before = this.estimateTokens(current);
-			current = this.stripBulkToolOutputs(current);
-			const after = this.estimateTokens(current);
-			const saved = before - after;
-			totalStripped += saved;
-
-			if (after <= tokenBudget) {
-				return {
-					messages: current,
-					stats: {
-						messagesStripped: saved,
-						tokensSaved: saved,
-						levelUsed: EvictionLevel.STRIP_BULK_OUTPUT,
-					},
-				};
-			}
-		}
-
-		// ── Level 3: Strip all non-error tool outputs ────────────────────────
-		if (maxLevel >= EvictionLevel.STRIP_ARTIFACTS) {
-			const before = this.estimateTokens(current);
-			current = this.stripArtifactToolOutputs(current);
-			const after = this.estimateTokens(current);
-			const saved = before - after;
-			totalStripped += saved;
-
-			if (after <= tokenBudget) {
-				return {
-					messages: current,
-					stats: {
-						messagesStripped: saved,
-						tokensSaved: saved,
-						levelUsed: EvictionLevel.STRIP_ARTIFACTS,
-					},
-				};
-			}
-		}
-
-		// ── Level 4: Full message removal (oldest non-protected first) ────────
-		if (maxLevel >= EvictionLevel.FULL_REMOVAL) {
-			const before = this.estimateTokens(current);
-			current = this.removeOldCompressibleMessages(current, tokenBudget);
-			const after = this.estimateTokens(current);
-			const saved = before - after;
-			totalStripped += saved;
-
-			return {
-				messages: current,
-				stats: {
-					messagesStripped: saved,
-					tokensSaved: saved,
-					levelUsed: EvictionLevel.FULL_REMOVAL,
-				},
-			};
 		}
 
 		return {
@@ -1029,17 +942,7 @@ export class UltraCompactEngine {
 			if (msg.role !== "tool") return msg;
 			const content = messageContent(msg);
 
-			// Preserve error outputs
-			if (
-				content.includes("Error:") ||
-				content.includes("error:") ||
-				content.includes("failed") ||
-				content.includes("Failed") ||
-				content.includes("exit code") ||
-				content.includes("exit status") ||
-				content.includes("SyntaxError") ||
-				content.includes("TypeError")
-			) {
+			if (containsErrorIndicators(content)) {
 				return msg;
 			}
 
@@ -1241,55 +1144,24 @@ export class UltraCompactEngine {
 		return Math.min(1, maxWeight);
 	}
 
-	/**
-	 * Extract goals from messages
-	 */
 	private extractGoals(messages: Message[]): string[] {
-		const goals: string[] = [];
-		const goalPattern =
-			/\b(?:GOAL|OBJECTIVE|TARGET|WANT TO|TRYING TO)\b:?\s*(.+)/i;
-
-		for (const msg of messages) {
-			const text = messageContent(msg);
-			const match = text.match(goalPattern);
-			if (match) {
-				goals.push(match[1].trim());
-			}
-		}
-
-		return [...new Set(goals)];
+		return extractByPattern(messages, "goal");
 	}
 
-	/**
-	 * Extract decisions from messages
-	 */
 	private extractDecisions(messages: Message[]): string[] {
-		const decisions: string[] = [];
-		const decisionPattern = /\b(?:DECIDED|DECISION|CHOSE|SELECTED)\b:?\s*(.+)/i;
-
-		for (const msg of messages) {
-			const text = messageContent(msg);
-			const match = text.match(decisionPattern);
-			if (match) {
-				decisions.push(match[1].trim());
-			}
-		}
-
-		return [...new Set(decisions)];
+		return extractByPattern(messages, "decision");
 	}
 
 	/**
-	 * Extract errors and solutions from messages
+	 * Extract errors paired with solutions when both appear in the same message.
 	 */
 	private extractErrors(messages: Message[]): string[] {
 		const errors: string[] = [];
-		const errorPattern = /\b(?:ERROR|FAILED|BUG|ISSUE|PROBLEM)\b:?\s*(.+)/i;
-		const solutionPattern = /\b(?:SOLUTION|FIX|RESOLVED|FIXED)\b:?\s*(.+)/i;
 
 		for (const msg of messages) {
 			const text = messageContent(msg);
-			const errorMatch = text.match(errorPattern);
-			const solutionMatch = text.match(solutionPattern);
+			const errorMatch = text.match(KEYWORD_PATTERNS.error.pattern);
+			const solutionMatch = text.match(KEYWORD_PATTERNS.solution.pattern);
 
 			if (errorMatch) {
 				const error = errorMatch[1].trim();
@@ -1349,22 +1221,8 @@ export class UltraCompactEngine {
 		};
 	}
 
-	/**
-	 * Extract next steps from messages
-	 */
 	private extractNextSteps(messages: Message[]): string[] {
-		const steps: string[] = [];
-		const stepPattern = /\b(?:NEXT|TODO|SHOULD|PLAN TO|NEED TO)\b:?\s*(.+)/i;
-
-		for (const msg of messages) {
-			const text = messageContent(msg);
-			const match = text.match(stepPattern);
-			if (match) {
-				steps.push(match[1].trim());
-			}
-		}
-
-		return [...new Set(steps)].slice(0, 5);
+		return extractByPattern(messages, "next").slice(0, 5);
 	}
 
 	/**
