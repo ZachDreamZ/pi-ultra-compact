@@ -70,25 +70,37 @@ function handleUltracompactCommand(
 
 		// Use Pi's built-in compact() API with a marker so our
 		// session_before_compact hook applies ultra-compact logic
-		ctx.compact({
-			customInstructions: "ultracompact",
-			onComplete: () => {
-				if (typeof ctx.ui?.notify === "function") {
-					ctx.ui.notify("Ultra-compact compaction complete!", "success");
-				}
-			},
-			onError: (error: unknown) => {
-				const errMsg = error instanceof Error ? error.message : String(error);
-				if (typeof ctx.ui?.notify === "function") {
-					ctx.ui.notify(`Ultra-compact failed: ${errMsg}`, "error");
-				} else {
-					console.error(
-						"[pi-ultra-compact] Ultra-compact failed:",
-						errMsg,
-					);
-				}
-			},
-		});
+		try {
+			ctx.compact({
+				customInstructions: "ultracompact",
+				onComplete: () => {
+					if (typeof ctx.ui?.notify === "function") {
+						ctx.ui.notify("Ultra-compact compaction complete!", "success");
+					}
+				},
+				onError: (error: unknown) => {
+					const errMsg =
+						error instanceof Error ? error.message : String(error);
+					if (typeof ctx.ui?.notify === "function") {
+						ctx.ui.notify(`Ultra-compact failed: ${errMsg}`, "error");
+					} else {
+						console.error(
+							"[pi-ultra-compact] Ultra-compact failed:",
+							errMsg,
+						);
+					}
+				},
+			});
+		} catch (error: unknown) {
+			const errMsg =
+				error instanceof Error ? error.message : String(error);
+			console.error(
+				`[pi-ultra-compact] ctx.compact() threw synchronously: ${errMsg}`,
+			);
+			if (typeof ctx.ui?.notify === "function") {
+				ctx.ui.notify(`Ultra-compact failed: ${errMsg}`, "error");
+			}
+		}
 	};
 }
 
@@ -145,13 +157,15 @@ function handleBeforeCompact(
 		}
 
 		const currentTokens = preparation.tokensBefore;
-		if (typeof currentTokens !== "number" || !isFinite(currentTokens) || currentTokens < 0) {
-			console.warn("[pi-ultra-compact] Invalid tokensBefore in preparation, skipping compaction");
-			return undefined;
-		}
-
 		const messagesToCompact = preparation.messagesToSummarize;
 		const isManual = event?.customInstructions === "ultracompact";
+
+		if (typeof currentTokens !== "number" || !isFinite(currentTokens) || currentTokens < 0) {
+			console.warn(
+				"[pi-ultra-compact] Invalid tokensBefore in preparation, skipping compaction",
+			);
+			return undefined;
+		}
 
 		if (!Array.isArray(messagesToCompact) || messagesToCompact.length === 0) {
 			return undefined;
@@ -189,11 +203,22 @@ function handleBeforeCompact(
 			);
 		}
 
-		// ── Snapshot ────────────────────────────────────────────────────
-		const snapshot = JSON.parse(JSON.stringify(messagesToCompact));
-		let snapshotPreviousSummary = preparation.previousSummary;
-
 		try {
+			// ── Snapshot ────────────────────────────────────────────────────
+			let snapshot: any[];
+			try {
+				snapshot = JSON.parse(JSON.stringify(messagesToCompact));
+			} catch (cloneError: unknown) {
+				const errMsg =
+					cloneError instanceof Error
+						? cloneError.message
+						: String(cloneError);
+				console.error(
+					`[pi-ultra-compact] Failed to snapshot messages for rollback: ${errMsg}`,
+				);
+				snapshot = [...messagesToCompact];
+			}
+			let snapshotPreviousSummary = preparation.previousSummary;
 			// ── Cache-Aware: append instead of rewrite ──────────────────
 			// When cache-aware is enabled, the previous summary is kept as-is
 			// and only the NEW content is summarized. This keeps the prefix stable
@@ -265,12 +290,13 @@ function handleBeforeCompact(
 					},
 				},
 			};
-		} catch (error) {
+		} catch (error: unknown) {
 			// ── Circuit breaker ─────────────────────────────────────────
 			compactionFailures++;
+			const errMsg =
+				error instanceof Error ? error.message : String(error);
 			console.error(
-				`[pi-ultra-compact] Compaction failed (${compactionFailures}/${engine["config"]?.circuitBreakerMaxFailures ?? 3}):`,
-				error,
+				`[pi-ultra-compact] Compaction failed (${compactionFailures}/${engine["config"]?.circuitBreakerMaxFailures ?? 3}): ${errMsg}`,
 			);
 
 			if (
@@ -283,8 +309,15 @@ function handleBeforeCompact(
 
 				// ── Lossy truncation (last resort) ──────────────────────
 				const tailKeep = 10;
-				const system = snapshot.filter((m: any) => m.role === "system");
-				const nonSystem = snapshot.filter((m: any) => m.role !== "system");
+				const fallbackMessages = Array.isArray(messagesToCompact)
+					? messagesToCompact
+					: [];
+				const system = fallbackMessages.filter(
+					(m: any) => m.role === "system",
+				);
+				const nonSystem = fallbackMessages.filter(
+					(m: any) => m.role !== "system",
+				);
 				const tail = nonSystem.slice(-tailKeep);
 
 				const lossySummary = [

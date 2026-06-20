@@ -1118,8 +1118,12 @@ export class UltraCompactEngine {
 					? `## Previous Context\n${previousSummary}\n\n`
 					: "";
 				return header + "## Summary\n" + llmResult;
-			} catch {
-				// Fallback to heuristic if LLM fails
+			} catch (error: unknown) {
+				const errMsg =
+					error instanceof Error ? error.message : String(error);
+				console.warn(
+					`[pi-ultra-compact] LLM summarization failed, falling back to heuristic: ${errMsg}`,
+				);
 			}
 		}
 		return this.generateStructuredSummary(
