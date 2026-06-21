@@ -136,3 +136,49 @@ export interface SessionContext {
 	maxTokens: number;
 	summary?: string;
 }
+
+// ─── Pi Extension API Types ────────────────────────────────────────────────
+
+/** Model information from Pi runtime context */
+export interface PiModel {
+	id: string;
+	contextWindow?: number;
+}
+
+/** UI notification helpers from Pi context */
+export interface PiUI {
+	notify?: (message: string, level: "info" | "warn" | "error") => void;
+}
+
+/** Pi runtime context passed to event handlers */
+export interface PiContext {
+	model?: PiModel;
+	ui?: PiUI;
+}
+
+/** Preparation object passed in the before_compact event */
+export interface CompactPreparation {
+	tokensBefore: number;
+	messagesToSummarize: Message[];
+	firstKeptEntryId?: string;
+	previousSummary?: string;
+}
+
+/** before_compact event payload */
+export interface BeforeCompactEvent {
+	preparation?: CompactPreparation;
+	customInstructions?: string;
+}
+
+/** model_select event payload */
+export interface ModelSelectEvent {
+	models?: Array<{ id: string; contextWindow?: number }>;
+}
+
+/** Pi extension registration helpers */
+export interface PiExtensionAPI {
+	on: (event: string, handler: (...args: unknown[]) => unknown) => void;
+	commands?: {
+		register: (name: string, handler: (...args: unknown[]) => unknown) => void;
+	};
+}

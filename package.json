@@ -38,7 +38,12 @@
     "@earendil-works/pi-coding-agent": "^0.79.3",
     "@earendil-works/pi-tui": "^0.79.3",
     "@types/jest": "^30.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/parser": "^8.61.1",
+    "eslint": "^10.5.0",
+    "eslint-config-prettier": "^10.1.8",
     "jest": "^30.4.2",
+    "prettier": "^3.8.4",
     "ts-jest": "^29.4.11",
     "typescript": "^5.4.0"
   },
@@ -46,8 +51,10 @@
     "build": "tsc",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'Linting not configured yet'",
-    "format": "echo 'Formatting not configured yet'"
+    "lint": "eslint extensions/ tests/",
+    "lint:fix": "eslint extensions/ tests/ --fix",
+    "format": "prettier --write extensions/ tests/",
+    "format:check": "prettier --check extensions/ tests/"
   },
   "files": [
     "extensions",
@@ -57,6 +64,6 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   }
 }
