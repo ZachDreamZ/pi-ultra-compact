@@ -48,7 +48,7 @@ function reconfigureEngineForCurrentModel(engine: UltraCompactEngine): void {
 	if (currentModel?.id) {
 		modelId = currentModel.id;
 	}
-	engine.reconfigure(modelId);
+	engine.reconfigure(modelId, currentModel?.contextWindow);
 }
 
 /**
@@ -153,9 +153,9 @@ function handleBeforeCompact(
 				id: ctx.model.id,
 				contextWindow: ctx.model.contextWindow,
 			};
-			engine.reconfigure(ctx.model.id);
+			engine.reconfigure(ctx.model.id, ctx.model.contextWindow);
 		} else if (currentModel?.id) {
-			engine.reconfigure(currentModel.id);
+			engine.reconfigure(currentModel.id, currentModel.contextWindow);
 		}
 
 		const preparation = event?.preparation;
