@@ -180,7 +180,7 @@ describe("/ultracompact command handler", () => {
 		handler({}, ctx);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(
 			"Ultra-compact compaction complete!",
-			"success",
+			"info",
 		);
 	});
 
@@ -518,7 +518,7 @@ describe("circuit breaker", () => {
 			expect(r2?.compaction?.summary).toContain("circuit breaker engaged");
 			expect(notify).toHaveBeenCalledWith(
 				expect.stringContaining("emergency truncation"),
-				"warning",
+				"warn",
 			);
 		} finally {
 			UltraCompactEngine.prototype.generateSummary = origGenerateSummary;

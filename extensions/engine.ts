@@ -275,6 +275,30 @@ export class UltraCompactEngine {
 	}
 
 	/**
+	 * Get the output headroom (tokens reserved for model response).
+	 */
+	public getOutputHeadroom(): number {
+		return this.config.outputHeadroom;
+	}
+
+	/**
+	 * Whether cache-aware compaction is enabled.
+	 */
+	public isCacheAware(): boolean {
+		return this.config.cacheAware;
+	}
+
+	/**
+	 * Get circuit breaker configuration.
+	 */
+	public getCircuitBreakerConfig(): { maxFailures: number; cooldown: number } {
+		return {
+			maxFailures: this.config.circuitBreakerMaxFailures,
+			cooldown: this.config.circuitBreakerCooldown,
+		};
+	}
+
+	/**
 	 * Get the effective threshold used by shouldCompact
 	 */
 	public shouldCompactDefaultThreshold(): number {
@@ -338,15 +362,15 @@ export class UltraCompactEngine {
 	 * Determine which compaction tier to use based on token usage.
 	 *
 	 * - NONE: < 60% usage — no compaction needed
-	 * - MICRO: 60-90% usage — fast tool-output pruning (no LLM)
-	 * - FULL: >= 90% usage — full structured summarization
+	 * - MICRO: 60-95% usage — fast tool-output pruning (no LLM)
+	 * - FULL: >= 95% usage — full structured summarization
 	 */
 	public determineTier(messages: Message[]): CompactionTier {
 		const tokens = this.estimateTokens(messages);
 		const ratio = this.contextWindow > 0 ? tokens / this.contextWindow : 0;
 
 		if (ratio >= this.config.hardWatermark) return CompactionTier.FULL;
-		if (ratio >= this.config.preemptiveWatermark) return CompactionTier.MICRO;
+		if (ratio >= 0.6) return CompactionTier.MICRO;
 		return CompactionTier.NONE;
 	}
 
@@ -442,11 +466,8 @@ export class UltraCompactEngine {
 		const preprocessed = this.preprocessMessages(messages);
 
 		// Phase 2: Classification
-		const {
-			protected: protectedMsgs,
-			compressible,
-			discardable: _discardable,
-		} = this.classifyMessages(preprocessed);
+		const { protected: protectedMsgs, compressible } =
+			this.classifyMessages(preprocessed);
 
 		const tokensBefore = this.estimateTokens(messages);
 		const targetBudget = this.calculateKeepTokens(tokensBefore);
@@ -483,9 +504,6 @@ export class UltraCompactEngine {
 		}
 
 		// Phase 4: Calculate metrics
-
-		// Phase 5: Calculate metrics
-		const protectedTokens = this.estimateTokens(protectedMsgs);
 		const summaryTokens = this.estimateTokens([
 			{
 				id: "summary",
@@ -494,7 +512,9 @@ export class UltraCompactEngine {
 				timestamp: Date.now(),
 			},
 		]);
-		const tokensAfter = protectedTokens + summaryTokens;
+		// tokensAfter represents only the summary output size (not protected messages,
+		// which are retained by the caller). This ensures compressionRatio < 1.
+		const tokensAfter = summaryTokens;
 
 		const fileOps = this.extractFileOperations(messages);
 
@@ -910,10 +930,14 @@ export class UltraCompactEngine {
 			if (msg.role !== "assistant") return msg;
 			if (!Array.isArray(msg.content)) return msg;
 
-			const hasThinking = msg.content.some((b: any) => b?.type === "thinking");
+			const hasThinking = msg.content.some(
+				(b) => (b as { type?: string })?.type === "thinking",
+			);
 			if (!hasThinking) return msg;
 
-			const newContent = msg.content.filter((b: any) => b?.type !== "thinking");
+			const newContent = msg.content.filter(
+				(b) => (b as { type?: string })?.type !== "thinking",
+			);
 			// If all content was thinking, keep a placeholder
 			if (newContent.length === 0) {
 				return { ...msg, content: "[reasoning stripped]" };

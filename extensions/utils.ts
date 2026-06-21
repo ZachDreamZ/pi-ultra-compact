@@ -5,7 +5,7 @@
  * information extraction, error detection, and result construction.
  */
 
-import type { CompactionResult, Message } from "./types";
+import type { CompactionResult, Message, TextContent } from "./types";
 
 /**
  * Normalize message content to string, handling both plain text and structured arrays.
@@ -15,8 +15,8 @@ export function messageContent(msg: Message): string {
 	if (typeof c === "string") return c;
 	if (Array.isArray(c)) {
 		return c
-			.filter((block: any): boolean => block?.type === "text")
-			.map((block: any): string => block.text ?? "")
+			.filter((block): block is TextContent => block?.type === "text")
+			.map((block) => block.text ?? "")
 			.join(" ");
 	}
 	return String(c ?? "");
