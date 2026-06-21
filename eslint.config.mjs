@@ -7,9 +7,6 @@ export default [
 		files: ["**/*.ts"],
 		languageOptions: {
 			parser: tsParser,
-			parserOptions: {
-				project: "./tsconfig.json",
-			},
 		},
 		plugins: {
 			"@typescript-eslint": tsPlugin,
@@ -22,6 +19,13 @@ export default [
 				{ argsIgnorePattern: "^_" },
 			],
 			"no-console": "off",
+		},
+	},
+	{
+		files: ["tests/**/*.ts"],
+		rules: {
+			"@typescript-eslint/no-explicit-any": "off",
+			"@typescript-eslint/no-unsafe-function-type": "off",
 		},
 	},
 	{
