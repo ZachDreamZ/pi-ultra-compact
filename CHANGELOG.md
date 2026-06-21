@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-20
+
+### Added
+
+- **Model ID normalization** — new `normalizeModelId()` function strips provider prefixes (`opencode/`, `openai/`, `anthropic/`, etc.), trailing suffixes (`-free`, `-latest`, `-preview`, `-exp`, `-beta`, `-online`), and date stamps (e.g. `-20250610`) before lookup
+- **70+ model entries** — expanded `MODEL_CONTEXT_WINDOWS` from ~30 to 70+ entries:
+  - OpenAI: GPT-5.1 through 5.5, Codex variants
+  - Anthropic: OpenCode-style naming (`claude-sonnet-4`, `claude-opus-4-5`, etc.)
+  - Google: Gemini 3.x, Gemma
+  - DeepSeek: V4 Flash (200K)
+  - Qwen: 3.6/3.5/3 Plus/Max, 2.5 Coder
+  - Kimi/Moonshot: K2.6/K2.5/K2
+  - MiniMax: M2.7/M2.5
+  - GLM (Zhipu): 5.1/5/4-Plus
+  - xAI: Grok Build
+  - NVIDIA: Nemotron 3 Super/4
+  - Xiaomi: MiMo V2.5 Pro
+  - OpenCode: big-pickle
+- **20+ model family patterns** — expanded `detectModelFamily()` from 6 to 20+ patterns (alibaba, moonshot, minimax, zhipu, xai, nvidia, xiaomi, opencode, and more)
+- **Runtime context window support** — `reconfigure()` now accepts optional `runtimeContextWindow` parameter; when Pi provides `ctx.model.contextWindow`, it takes priority over heuristic detection
+- **17 new detection tests** — parameterized tests covering provider-prefixed IDs, suffix stripping, all new families, and runtime context window override
+
+### Changed
+
+- **`detectContextWindow()`** now normalizes model IDs before lookup (strips prefixes/suffixes/dates)
+- **`detectModelFamily()`** now normalizes input and recognizes o1/o3/o4 as OpenAI
+- **`getModelRecommendations()`** delegates normalization to `detectModelFamily()` instead of raw `.toLowerCase()`
+- **`index.ts`** passes `ctx.model.contextWindow` to `engine.reconfigure()` for authoritative context window sizing
+
 ## [0.8.0] - 2026-06-17
 
 ### Added

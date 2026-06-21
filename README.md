@@ -1,6 +1,6 @@
 # pi-ultra-compact
 
-Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic threshold-based compaction and support for 200+ models.
+Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic threshold-based compaction and support for 70+ models across 15+ providers.
 
 [![Pi Package](https://img.shields.io/badge/Pi-Package-blue)](https://pi.dev/packages)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,7 +10,9 @@ Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic
 
 - **`/ultracompact` command** for manual compaction
 - **Auto-adapts threshold** to model's context window (60-80% of max)
-- **200+ models supported** - OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral, Qwen, and more
+- **70+ models supported** - OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral, Qwen, Kimi, MiniMax, GLM, xAI, NVIDIA, Xiaomi, and more
+- **Smart model ID normalization** - automatically strips provider prefixes (`opencode/`, `openai/`, etc.), suffixes (`-free`, `-latest`, `-preview`), and date stamps
+- **Runtime context window** - uses Pi's authoritative context window when available, falls back to detection
 - **Graduated Eviction (4 levels)** — strips reasoning, bulk outputs, artifacts, then messages
 - **Generational Compaction** — micro (fast, no LLM) at 60-90%, full at 90%+
 - **Preemptive Trigger** — fires before next turn, never pays latency during user turns
@@ -48,17 +50,22 @@ Auto-compaction triggers automatically when context exceeds 80% of your model's 
 
 | Provider | Models | Context Window |
 |----------|--------|----------------|
-| **OpenAI** | GPT-5/5.1/5.2, GPT-4.1, GPT-4o, O3, O4-mini | 8K - 1M tokens |
-| **Anthropic** | Claude 4.5/4.0/3.7/3.5/3 | 200K tokens |
-| **Google** | Gemini 2.5/2.0/1.5, Gemma 3/2 | 32K - 2M tokens |
-| **DeepSeek** | V4 Pro, V3, V2.5, R1 | 64K - 1M tokens |
-| **Meta** | Llama 4, 3.3, 3.1, 3, 2 | 4K - 1M tokens |
-| **Mistral** | Medium 3.5, Large 3, Small 4, Codestral | 32K - 256K tokens |
-| **Qwen** | Qwen3, Qwen2.5, Qwen2 | 32K - 128K tokens |
-| **Microsoft** | Phi-4, Phi-3, Phi-2 | 2K - 32K tokens |
-| **xAI** | Grok 3, Grok 2 | 8K - 131K tokens |
-| **Cohere** | Command R+ | 128K tokens |
-| **Yi** | Yi-1.5, Yi-34B | 4K - 200K tokens |
+| **OpenAI** | GPT-5/5.1/5.2/5.4/5.5, GPT-4.1, GPT-4o, O1/O3/O4 | 128K - 1.1M tokens |
+| **Anthropic** | Claude Opus/Sonnet/Haiku 4.x, 3.x | 200K - 1M tokens |
+| **Google** | Gemini 3.5/3.1/2.5/2.0/1.5, Gemma 3/2 | 8K - 2M tokens |
+| **DeepSeek** | V4 Pro/Flash, V3, V2.5, R1 | 64K - 1M tokens |
+| **Meta** | Llama 4 Maverick/Scout, 3.3, 3.1 | 128K - 1M tokens |
+| **Mistral** | Medium 3.5, Large 3, Codestral | 128K - 256K tokens |
+| **Qwen** | Qwen 3.6/3.5/3, Qwen 2.5 Coder | 131K - 262K tokens |
+| **Kimi/Moonshot** | Kimi K2.6/K2.5/K2, Moonshot V1 | 128K - 262K tokens |
+| **MiniMax** | M2.7, M2.5 | 204K tokens |
+| **GLM (Zhipu)** | GLM 5.1/5/4-Plus | 128K - 204K tokens |
+| **xAI** | Grok Build, Grok 3/2 | 131K - 256K tokens |
+| **NVIDIA** | Nemotron 3 Super, Nemotron 4 | 128K - 204K tokens |
+| **Xiaomi** | MiMo V2.5 Pro/V2.5 | 1M tokens |
+| **OpenCode** | big-pickle | 200K tokens |
+
+Provider-prefixed model IDs are handled automatically (e.g. `opencode/deepseek-v4-flash-free` → `deepseek-v4-flash`).
 
 ## How It Works
 
@@ -113,10 +120,15 @@ Default settings work out of the box. The extension auto-detects your model and 
 
 ```bash
 # Works with any model - threshold auto-adapts
-# Claude Opus: 160,000 tokens (80% of 200K)
-# GPT-5: 320,000 tokens (80% of 400K)
+# Claude Sonnet 4: 160,000 tokens (80% of 200K)
+# GPT-5.4 Pro: 880,000 tokens (80% of 1.1M)
 # Gemini 2.5 Pro: 800,000 tokens (80% of 1M)
-# DeepSeek V4 Pro: 800,000 tokens (80% of 1M)
+# DeepSeek V4 Flash: 160,000 tokens (80% of 200K)
+# Kimi K2.5: 209,680 tokens (80% of 262K)
+
+# Provider-prefixed IDs work too:
+# opencode/deepseek-v4-flash-free → DeepSeek, 200K
+# opencode-go/kimi-k2.5 → Moonshot, 262K
 ```
 
 ## Compatibility
@@ -129,6 +141,14 @@ Default settings work out of the box. The extension auto-detects your model and 
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for full version history.
+
+### v0.9.0 - Model Detection Overhaul
+
+- **Smart model ID normalization** — strips provider prefixes, suffixes (`-free`, `-latest`), and date stamps
+- **70+ models** — added Qwen, Kimi, MiniMax, GLM, Grok, Nemotron, MiMo, OpenCode models
+- **20+ model families** — expanded from 6 to detect alibaba, moonshot, minimax, zhipu, xai, nvidia, xiaomi, opencode
+- **Runtime context window** — uses Pi's authoritative `ctx.model.contextWindow` when available
+- **195 tests, 100% pass rate** — 17 new detection tests
 
 ### v0.8.0 - Generational Compaction + Safety Systems
 
@@ -179,7 +199,7 @@ This release fixes 18 issues found via comprehensive 5-agent audit:
 ### Wrong threshold detected
 
 - The extension auto-detects your model from Pi config
-- Ensure your model is in the supported list (200+ models)
+- Ensure your model is in the supported list (70+ models)
 - Run `/ultracompact` manually to see detected model and threshold in the logs
 
 ## Contributing
