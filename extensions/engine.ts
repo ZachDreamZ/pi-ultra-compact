@@ -27,14 +27,30 @@ import {
 } from "./utils";
 
 /**
- * Comprehensive model context window sizes (in tokens)
+ * Comprehensive model context window sizes (in tokens).
+ * Keys are normalized: lowercase, no provider prefix, no trailing suffixes
+ * like -free, -latest, date stamps, etc.
  */
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-	// OpenAI
+	// ── OpenAI ───────────────────────────────────────────────────────────
 	"gpt-5": 400000,
 	"gpt-5-pro": 400000,
 	"gpt-5-mini": 400000,
 	"gpt-5-nano": 400000,
+	"gpt-5.1": 400000,
+	"gpt-5.1-codex": 400000,
+	"gpt-5.1-codex-max": 400000,
+	"gpt-5.1-codex-mini": 400000,
+	"gpt-5.2": 400000,
+	"gpt-5.2-codex": 400000,
+	"gpt-5.3-codex": 400000,
+	"gpt-5.4": 272000,
+	"gpt-5.4-mini": 400000,
+	"gpt-5.4-nano": 400000,
+	"gpt-5.4-pro": 1100000,
+	"gpt-5.5": 1100000,
+	"gpt-5.5-pro": 1100000,
+	"gpt-5-codex": 400000,
 	"gpt-4.1": 1047576,
 	"gpt-4.1-mini": 1047576,
 	"gpt-4.1-nano": 1047576,
@@ -48,7 +64,7 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 	"o3-mini": 200000,
 	"o4-mini": 200000,
 
-	// Anthropic
+	// ── Anthropic ────────────────────────────────────────────────────────
 	"claude-4.5-opus": 200000,
 	"claude-4.5-sonnet": 200000,
 	"claude-4.0-sonnet": 200000,
@@ -57,34 +73,155 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 	"claude-3-opus": 200000,
 	"claude-opus": 200000,
 	"claude-sonnet": 200000,
+	"claude-haiku": 200000,
+	// OpenCode-style naming (e.g. claude-sonnet-4, claude-opus-4-5)
+	"claude-sonnet-4": 200000,
+	"claude-sonnet-4-5": 200000,
+	"claude-sonnet-4-6": 1000000,
+	"claude-opus-4-1": 200000,
+	"claude-opus-4-5": 200000,
+	"claude-opus-4-6": 1000000,
+	"claude-opus-4-7": 1000000,
+	"claude-haiku-4-5": 200000,
 
-	// Google
+	// ── Google ───────────────────────────────────────────────────────────
+	"gemini-3.5-flash": 1000000,
+	"gemini-3.1-pro": 1000000,
+	"gemini-3-flash": 1000000,
 	"gemini-2.5-pro": 1000000,
 	"gemini-2.5-flash": 1000000,
 	"gemini-2.0-flash": 1000000,
 	"gemini-1.5-pro": 2000000,
 	"gemini-1.5-flash": 1000000,
+	"gemma-3": 128000,
+	"gemma-2": 8192,
 
-	// DeepSeek
+	// ── DeepSeek ─────────────────────────────────────────────────────────
 	"deepseek-v4-pro": 1000000,
+	"deepseek-v4-flash": 200000,
 	"deepseek-v4": 128000,
 	"deepseek-v3": 65536,
+	"deepseek-v2.5": 65536,
 	"deepseek-r1": 65536,
 
-	// Meta Llama
+	// ── Meta Llama ───────────────────────────────────────────────────────
 	"llama-4-maverick": 1000000,
 	"llama-4-scout": 1000000,
 	"llama-3.3-70b": 128000,
 	"llama-3.1-405b": 128000,
 
-	// Mistral
+	// ── Mistral ──────────────────────────────────────────────────────────
 	"mistral-medium-3.5": 128000,
 	"mistral-large-3": 128000,
 	codestral: 256000,
 
+	// ── Qwen (Alibaba) ──────────────────────────────────────────────────
+	"qwen3.6-plus": 262100,
+	"qwen3.5-plus": 262100,
+	"qwen3-plus": 262100,
+	"qwen3-max": 262100,
+	"qwen-2.5-coder": 131000,
+
+	// ── Kimi (Moonshot) ─────────────────────────────────────────────────
+	"kimi-k2.6": 262100,
+	"kimi-k2.5": 262100,
+	"kimi-k2": 262100,
+	"moonshot-v1": 128000,
+
+	// ── MiniMax ──────────────────────────────────────────────────────────
+	"minimax-m2.7": 204800,
+	"minimax-m2.5": 204800,
+
+	// ── GLM (Zhipu) ─────────────────────────────────────────────────────
+	"glm-5.1": 204800,
+	"glm-5": 204800,
+	"glm-4-plus": 128000,
+
+	// ── xAI ──────────────────────────────────────────────────────────────
+	"grok-build": 256000,
+	"grok-3": 131072,
+	"grok-2": 131072,
+
+	// ── NVIDIA ───────────────────────────────────────────────────────────
+	"nemotron-3-super": 204800,
+	"nemotron-4": 128000,
+
+	// ── Xiaomi MiMo ─────────────────────────────────────────────────────
+	"mimo-v2.5-pro": 1000000,
+	"mimo-v2.5": 1000000,
+
+	// ── Other ────────────────────────────────────────────────────────────
+	"big-pickle": 200000,
+
 	// Default
 	default: 128000,
 };
+
+/**
+ * Suffixes stripped from model IDs before lookup.
+ * Order matters: longer/more-specific suffixes first.
+ */
+const MODEL_STRIP_SUFFIXES = [
+	"-free",
+	"-latest",
+	"-preview",
+	"-exp",
+	"-beta",
+	"-online",
+];
+
+/**
+ * Provider prefixes stripped from model IDs (e.g. "opencode/deepseek-v4-flash-free").
+ */
+const PROVIDER_PREFIXES = [
+	"opencode/",
+	"opencode-go/",
+	"openai/",
+	"anthropic/",
+	"google/",
+	"deepseek/",
+	"groq/",
+	"fireworks/",
+	"together/",
+	"openrouter/",
+	"mistral/",
+	"xai/",
+	"bedrock/",
+	"vertex/",
+	"azure/",
+];
+
+/**
+ * Normalize a raw model ID for lookup:
+ * 1. Lowercase
+ * 2. Strip provider prefix ("opencode/deepseek-v4" → "deepseek-v4")
+ * 3. Strip common suffixes (-free, -latest, -preview, etc.)
+ * 4. Strip trailing date stamps (e.g. -20250610, -2025-06-10)
+ */
+function normalizeModelId(raw: string): string {
+	let id = raw.toLowerCase().trim();
+
+	// Strip provider prefix
+	for (const prefix of PROVIDER_PREFIXES) {
+		if (id.startsWith(prefix)) {
+			id = id.slice(prefix.length);
+			break;
+		}
+	}
+
+	// Strip trailing date stamps (e.g. -20250610 or -2025-06-10)
+	id = id.replace(/-\d{4}-?\d{2}-?\d{2}$/, "");
+
+	// Strip known suffixes
+	for (const suffix of MODEL_STRIP_SUFFIXES) {
+		if (id.endsWith(suffix)) {
+			id = id.slice(0, -suffix.length);
+			break;
+		}
+	}
+
+	return id;
+}
 
 /**
  * Importance signals for message scoring.
@@ -181,35 +318,51 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Detect context window size from model name
+	 * Detect context window size from model name.
+	 * Normalizes the ID (strips provider prefix, suffixes, date stamps)
+	 * then does exact lookup → substring match → family fallback.
 	 */
 	private detectContextWindow(modelName?: string): number {
 		if (!modelName) return MODEL_CONTEXT_WINDOWS["default"];
 
-		const normalized = modelName.toLowerCase();
+		const normalized = normalizeModelId(modelName);
 
+		// 1. Exact match
 		if (Object.hasOwn(MODEL_CONTEXT_WINDOWS, normalized)) {
 			return MODEL_CONTEXT_WINDOWS[normalized];
 		}
 
+		// 2. Substring match (both directions)
 		for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
+			if (key === "default") continue;
 			if (normalized.includes(key) || key.includes(normalized)) {
 				return value;
 			}
 		}
 
+		// 3. Family-based fallback
 		return this.detectFromFamily(normalized);
 	}
 
 	private detectFromFamily(normalized: string): number {
 		const familyDefaults: [string, number][] = [
 			["claude", 200000],
+			["gpt-5", 400000],
 			["gpt-4o", 128000],
 			["gpt-4", 8192],
 			["gemini", 1000000],
+			["gemma", 128000],
 			["deepseek", 128000],
 			["llama", 128000],
 			["mistral", 128000],
+			["qwen", 262100],
+			["kimi", 262100],
+			["moonshot", 128000],
+			["minimax", 204800],
+			["glm", 204800],
+			["grok", 131072],
+			["nemotron", 204800],
+			["mimo", 1000000],
 		];
 
 		for (const [family, defaultWindow] of familyDefaults) {
@@ -220,11 +373,15 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Dynamically reconfigure the engine with a new model name
+	 * Dynamically reconfigure the engine with a new model name.
+	 * If the Pi runtime provides contextWindow, it takes priority over detection.
 	 */
-	public reconfigure(modelName?: string): void {
+	public reconfigure(modelName?: string, runtimeContextWindow?: number): void {
 		this.config.modelName = modelName;
-		this.contextWindow = this.detectContextWindow(modelName);
+		this.contextWindow =
+			runtimeContextWindow && runtimeContextWindow > 0
+				? runtimeContextWindow
+				: this.detectContextWindow(modelName);
 		if (this.userThresholdOverride === undefined) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
 		}
@@ -246,8 +403,7 @@ export class UltraCompactEngine {
 		recommendedKeep: number;
 		modelFamily: string;
 	} {
-		const modelFamily = this.config.modelName?.toLowerCase() || "unknown";
-		const family = this.detectModelFamily(modelFamily);
+		const family = this.detectModelFamily(this.config.modelName || "unknown");
 
 		return {
 			contextWindow: this.contextWindow,
@@ -258,17 +414,32 @@ export class UltraCompactEngine {
 	}
 
 	private detectModelFamily(modelName: string): string {
+		const normalized = normalizeModelId(modelName);
 		const familyPatterns: [string, string][] = [
 			["claude", "anthropic"],
 			["gpt", "openai"],
+			["o1", "openai"],
+			["o3", "openai"],
+			["o4", "openai"],
 			["gemini", "google"],
+			["gemma", "google"],
 			["deepseek", "deepseek"],
 			["llama", "meta"],
 			["mistral", "mistral"],
+			["codestral", "mistral"],
+			["qwen", "alibaba"],
+			["kimi", "moonshot"],
+			["moonshot", "moonshot"],
+			["minimax", "minimax"],
+			["glm", "zhipu"],
+			["grok", "xai"],
+			["nemotron", "nvidia"],
+			["mimo", "xiaomi"],
+			["big-pickle", "opencode"],
 		];
 
 		for (const [pattern, family] of familyPatterns) {
-			if (modelName.includes(pattern)) return family;
+			if (normalized.includes(pattern)) return family;
 		}
 
 		return "unknown";
