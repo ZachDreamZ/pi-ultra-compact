@@ -1,6 +1,6 @@
 # pi-ultra-compact
 
-Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic threshold-based compaction and support for 70+ models across 15+ providers.
+Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic threshold-based compaction that follows Pi's active model metadata.
 
 [![Pi Package](https://img.shields.io/badge/Pi-Package-blue)](https://pi.dev/packages)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -9,10 +9,8 @@ Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic
 ## Features
 
 - **`/ultracompact` command** for manual compaction
-- **Auto-adapts threshold** to model's context window (60-80% of max)
-- **70+ models supported** - OpenAI, Anthropic, Google, DeepSeek, Meta, Mistral, Qwen, Kimi, MiniMax, GLM, xAI, NVIDIA, Xiaomi, and more
-- **Smart model ID normalization** - automatically strips provider prefixes (`opencode/`, `openai/`, etc.), suffixes (`-free`, `-latest`, `-preview`), and date stamps
-- **Runtime context window** - uses Pi's authoritative context window when available, falls back to detection
+- **Auto-adapts threshold** to Pi's active model context window
+- **Works with any Pi model** that exposes context window metadata
 - **Graduated Eviction (4 levels)** — strips reasoning, bulk outputs, artifacts, then messages
 - **Generational Compaction** — micro (fast, no LLM) at 60-90%, full at 90%+
 - **Preemptive Trigger** — fires before next turn, never pays latency during user turns
@@ -21,7 +19,7 @@ Advanced compaction extension and skill for [Pi](https://pi.dev/) with automatic
 - **Hierarchical summarization** with entropy-based information extraction
 - **Critical context preservation** - goals, decisions, errors, file paths
 - **Extension + Skill** - works as both a Pi extension and a skill
-- **Smart model switching** - remembers per-model thresholds and preserves custom settings
+- **Smart model switching** - follows Pi model metadata and preserves custom settings
 - **Conversation structure detection** - identifies turns, phases, and progress
 - **Multi-pass summarization** — progressive compression with quality scoring
 - **LLM-based summarization** — optional AI-powered compression (useLLM config)
@@ -44,28 +42,13 @@ After installation and restarting Pi, use:
 
 This triggers manual ultra-compact compaction.
 
-Auto-compaction triggers automatically when context exceeds 80% of your model's context window.
+Auto-compaction triggers automatically based on Pi's active model context window.
 
 ## Supported Models
 
-| Provider | Models | Context Window |
-|----------|--------|----------------|
-| **OpenAI** | GPT-5/5.1/5.2/5.4/5.5, GPT-4.1, GPT-4o, O1/O3/O4 | 128K - 1.1M tokens |
-| **Anthropic** | Claude Opus/Sonnet/Haiku 4.x, 3.x | 200K - 1M tokens |
-| **Google** | Gemini 3.5/3.1/2.5/2.0/1.5, Gemma 3/2 | 8K - 2M tokens |
-| **DeepSeek** | V4 Pro/Flash, V3, V2.5, R1 | 64K - 1M tokens |
-| **Meta** | Llama 4 Maverick/Scout, 3.3, 3.1 | 128K - 1M tokens |
-| **Mistral** | Medium 3.5, Large 3, Codestral | 128K - 256K tokens |
-| **Qwen** | Qwen 3.6/3.5/3, Qwen 2.5 Coder | 131K - 262K tokens |
-| **Kimi/Moonshot** | Kimi K2.6/K2.5/K2, Moonshot V1 | 128K - 262K tokens |
-| **MiniMax** | M2.7, M2.5 | 204K tokens |
-| **GLM (Zhipu)** | GLM 5.1/5/4-Plus | 128K - 204K tokens |
-| **xAI** | Grok Build, Grok 3/2 | 131K - 256K tokens |
-| **NVIDIA** | Nemotron 3 Super, Nemotron 4 | 128K - 204K tokens |
-| **Xiaomi** | MiMo V2.5 Pro/V2.5 | 1M tokens |
-| **OpenCode** | big-pickle | 200K tokens |
+The extension uses Pi's active model metadata as the source of truth for context window size. This avoids maintaining a separate model table in the extension and keeps thresholds aligned with Pi when new providers or models are added.
 
-Provider-prefixed model IDs are handled automatically (e.g. `opencode/deepseek-v4-flash-free` → `deepseek-v4-flash`).
+If Pi does not expose model metadata, the extension uses a conservative 128K-token fallback.
 
 ## How It Works
 
@@ -93,13 +76,13 @@ Provider-prefixed model IDs are handled automatically (e.g. `opencode/deepseek-v
 
 ## Configuration
 
-Default settings work out of the box. The extension auto-detects your model and sets appropriate thresholds.
+Default settings work out of the box. The extension reads Pi's active model metadata and sets thresholds from `ctx.model.contextWindow` when available.
 
 ### Default Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `thresholdTokens` | Auto (60-80% of context) | When to trigger compaction |
+| `thresholdTokens` | Auto (80% of Pi context window, or 102,400 without metadata) | When to trigger compaction |
 | `keepPercentage` | 30% | Percentage of context to keep |
 | `maxKeepTokens` | 30,000 | Maximum tokens to keep |
 | `autoCompact` | true | Enable automatic compaction |
@@ -116,20 +99,9 @@ Default settings work out of the box. The extension auto-detects your model and 
 |---------|-------------|
 | `/ultracompact` | Trigger manual ultra-compact compaction |
 
-## Model Examples
+## Model Metadata
 
-```bash
-# Works with any model - threshold auto-adapts
-# Claude Sonnet 4: 160,000 tokens (80% of 200K)
-# GPT-5.4 Pro: 880,000 tokens (80% of 1.1M)
-# Gemini 2.5 Pro: 800,000 tokens (80% of 1M)
-# DeepSeek V4 Flash: 160,000 tokens (80% of 200K)
-# Kimi K2.5: 209,680 tokens (80% of 262K)
-
-# Provider-prefixed IDs work too:
-# opencode/deepseek-v4-flash-free → DeepSeek, 200K
-# opencode-go/kimi-k2.5 → Moonshot, 262K
-```
+The extension does not ship its own model context-window table. Pi remains responsible for provider and model metadata; this extension uses the active model's `contextWindow` value for threshold calculation.
 
 ## Compatibility
 
@@ -142,14 +114,6 @@ Default settings work out of the box. The extension auto-detects your model and 
 
 See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
-### v0.9.0 - Model Detection Overhaul
-
-- **Smart model ID normalization** — strips provider prefixes, suffixes (`-free`, `-latest`), and date stamps
-- **70+ models** — added Qwen, Kimi, MiniMax, GLM, Grok, Nemotron, MiMo, OpenCode models
-- **20+ model families** — expanded from 6 to detect alibaba, moonshot, minimax, zhipu, xai, nvidia, xiaomi, opencode
-- **Runtime context window** — uses Pi's authoritative `ctx.model.contextWindow` when available
-- **195 tests, 100% pass rate** — 17 new detection tests
-
 ### v0.8.0 - Generational Compaction + Safety Systems
 
 - **Graduated Eviction** — 4-level content stripping (reasoning → bulk → artifacts → full)
@@ -157,7 +121,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 - **Preemptive Trigger** — fires at 70% watermark by projecting next turn
 - **Cache-Aware Mode** — immutable summary blocks preserve prompt cache
 - **Snapshot-Rollback + Circuit Breaker** — session never dies from bad compaction
-- **66 tests, 100% pass rate** — zero regressions
+- **Vitest suite passing** — zero regressions
 
 ### v0.7.0 - Compact Templates & LLM Summarization
 
@@ -171,7 +135,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
 Major improvements to compaction quality and performance:
 
-- **Smart model switching** - per-model threshold memory, preserves custom settings
+- **Smart model switching** - follows Pi model metadata and preserves custom settings
 - **Conversation structure detection** - identifies turns, phases, progress
 - **Enhanced critical extraction** - progress indicators, questions, user preferences
 - **Multi-pass summarization** - 3-pass compression with quality scoring
@@ -198,9 +162,9 @@ This release fixes 18 issues found via comprehensive 5-agent audit:
 
 ### Wrong threshold detected
 
-- The extension auto-detects your model from Pi config
-- Ensure your model is in the supported list (70+ models)
-- Run `/ultracompact` manually to see detected model and threshold in the logs
+- The extension reads Pi's active model metadata at session start and model switch time
+- Ensure Pi reports a `contextWindow` for your selected model
+- If Pi does not expose model metadata, the extension falls back to 128K tokens
 
 ## Contributing
 

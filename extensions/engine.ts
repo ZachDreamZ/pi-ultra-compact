@@ -18,224 +18,73 @@ import type {
 	MicroCompactStats,
 } from "./types";
 import { EvictionLevel, CompactionTier } from "./types";
-import {
-	messageContent,
-	KEYWORD_PATTERNS,
-	extractByPattern,
-	containsErrorIndicators,
-	emptyCompactionResult,
-} from "./utils";
 
 /**
- * Comprehensive model context window sizes (in tokens).
- * Keys are normalized: lowercase, no provider prefix, no trailing suffixes
- * like -free, -latest, date stamps, etc.
+ * Normalize message content to string, handling both plain text and structured arrays.
  */
-const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-	// ── OpenAI ───────────────────────────────────────────────────────────
-	"gpt-5": 400000,
-	"gpt-5-pro": 400000,
-	"gpt-5-mini": 400000,
-	"gpt-5-nano": 400000,
-	"gpt-5.1": 400000,
-	"gpt-5.1-codex": 400000,
-	"gpt-5.1-codex-max": 400000,
-	"gpt-5.1-codex-mini": 400000,
-	"gpt-5.2": 400000,
-	"gpt-5.2-codex": 400000,
-	"gpt-5.3-codex": 400000,
-	"gpt-5.4": 272000,
-	"gpt-5.4-mini": 400000,
-	"gpt-5.4-nano": 400000,
-	"gpt-5.4-pro": 1100000,
-	"gpt-5.5": 1100000,
-	"gpt-5.5-pro": 1100000,
-	"gpt-5-codex": 400000,
-	"gpt-4.1": 1047576,
-	"gpt-4.1-mini": 1047576,
-	"gpt-4.1-nano": 1047576,
-	"gpt-4o": 128000,
-	"gpt-4o-mini": 128000,
-	"gpt-4-turbo": 128000,
-	o1: 200000,
-	"o1-mini": 128000,
-	"o1-pro": 200000,
-	o3: 200000,
-	"o3-mini": 200000,
-	"o4-mini": 200000,
-
-	// ── Anthropic ────────────────────────────────────────────────────────
-	"claude-4.5-opus": 200000,
-	"claude-4.5-sonnet": 200000,
-	"claude-4.0-sonnet": 200000,
-	"claude-3.7-sonnet": 200000,
-	"claude-3.5-sonnet": 200000,
-	"claude-3-opus": 200000,
-	"claude-opus": 200000,
-	"claude-sonnet": 200000,
-	"claude-haiku": 200000,
-	// OpenCode-style naming (e.g. claude-sonnet-4, claude-opus-4-5)
-	"claude-sonnet-4": 200000,
-	"claude-sonnet-4-5": 200000,
-	"claude-sonnet-4-6": 1000000,
-	"claude-opus-4-1": 200000,
-	"claude-opus-4-5": 200000,
-	"claude-opus-4-6": 1000000,
-	"claude-opus-4-7": 1000000,
-	"claude-haiku-4-5": 200000,
-
-	// ── Google ───────────────────────────────────────────────────────────
-	"gemini-3.5-flash": 1000000,
-	"gemini-3.1-pro": 1000000,
-	"gemini-3-flash": 1000000,
-	"gemini-2.5-pro": 1000000,
-	"gemini-2.5-flash": 1000000,
-	"gemini-2.0-flash": 1000000,
-	"gemini-1.5-pro": 2000000,
-	"gemini-1.5-flash": 1000000,
-	"gemma-3": 128000,
-	"gemma-2": 8192,
-
-	// ── DeepSeek ─────────────────────────────────────────────────────────
-	"deepseek-v4-pro": 1000000,
-	"deepseek-v4-flash": 200000,
-	"deepseek-v4": 128000,
-	"deepseek-v3": 65536,
-	"deepseek-v2.5": 65536,
-	"deepseek-r1": 65536,
-
-	// ── Meta Llama ───────────────────────────────────────────────────────
-	"llama-4-maverick": 1000000,
-	"llama-4-scout": 1000000,
-	"llama-3.3-70b": 128000,
-	"llama-3.1-405b": 128000,
-
-	// ── Mistral ──────────────────────────────────────────────────────────
-	"mistral-medium-3.5": 128000,
-	"mistral-large-3": 128000,
-	codestral: 256000,
-
-	// ── Qwen (Alibaba) ──────────────────────────────────────────────────
-	"qwen3.6-plus": 262100,
-	"qwen3.5-plus": 262100,
-	"qwen3-plus": 262100,
-	"qwen3-max": 262100,
-	"qwen-2.5-coder": 131000,
-
-	// ── Kimi (Moonshot) ─────────────────────────────────────────────────
-	"kimi-k2.6": 262100,
-	"kimi-k2.5": 262100,
-	"kimi-k2": 262100,
-	"moonshot-v1": 128000,
-
-	// ── MiniMax ──────────────────────────────────────────────────────────
-	"minimax-m2.7": 204800,
-	"minimax-m2.5": 204800,
-
-	// ── GLM (Zhipu) ─────────────────────────────────────────────────────
-	"glm-5.1": 204800,
-	"glm-5": 204800,
-	"glm-4-plus": 128000,
-
-	// ── xAI ──────────────────────────────────────────────────────────────
-	"grok-build": 256000,
-	"grok-3": 131072,
-	"grok-2": 131072,
-
-	// ── NVIDIA ───────────────────────────────────────────────────────────
-	"nemotron-3-super": 204800,
-	"nemotron-4": 128000,
-
-	// ── Xiaomi MiMo ─────────────────────────────────────────────────────
-	"mimo-v2.5-pro": 1000000,
-	"mimo-v2.5": 1000000,
-
-	// ── Other ────────────────────────────────────────────────────────────
-	"big-pickle": 200000,
-
-	// Default
-	default: 128000,
-};
-
-/**
- * Suffixes stripped from model IDs before lookup.
- * Order matters: longer/more-specific suffixes first.
- */
-const MODEL_STRIP_SUFFIXES = [
-	"-free",
-	"-latest",
-	"-preview",
-	"-exp",
-	"-beta",
-	"-online",
-];
-
-/**
- * Provider prefixes stripped from model IDs (e.g. "opencode/deepseek-v4-flash-free").
- */
-const PROVIDER_PREFIXES = [
-	"opencode/",
-	"opencode-go/",
-	"openai/",
-	"anthropic/",
-	"google/",
-	"deepseek/",
-	"groq/",
-	"fireworks/",
-	"together/",
-	"openrouter/",
-	"mistral/",
-	"xai/",
-	"bedrock/",
-	"vertex/",
-	"azure/",
-];
-
-/**
- * Normalize a raw model ID for lookup:
- * 1. Lowercase
- * 2. Strip provider prefix ("opencode/deepseek-v4" → "deepseek-v4")
- * 3. Strip common suffixes (-free, -latest, -preview, etc.)
- * 4. Strip trailing date stamps (e.g. -20250610, -2025-06-10)
- */
-function normalizeModelId(raw: string): string {
-	let id = raw.toLowerCase().trim();
-
-	// Strip provider prefix
-	for (const prefix of PROVIDER_PREFIXES) {
-		if (id.startsWith(prefix)) {
-			id = id.slice(prefix.length);
-			break;
-		}
+function messageContent(msg: Message): string {
+	const c = msg.content;
+	if (typeof c === "string") return c;
+	if (Array.isArray(c)) {
+		return c
+			.filter((block: any): boolean => block?.type === "text")
+			.map((block: any): string => block.text ?? "")
+			.join(" ");
 	}
-
-	// Strip trailing date stamps (e.g. -20250610 or -2025-06-10)
-	id = id.replace(/-\d{4}-?\d{2}-?\d{2}$/, "");
-
-	// Strip known suffixes
-	for (const suffix of MODEL_STRIP_SUFFIXES) {
-		if (id.endsWith(suffix)) {
-			id = id.slice(0, -suffix.length);
-			break;
-		}
-	}
-
-	return id;
+	return String(c ?? "");
 }
 
+const DEFAULT_CONTEXT_WINDOW = 128000;
+
 /**
- * Importance signals for message scoring.
- * Keyword patterns are sourced from KEYWORD_PATTERNS (shared with extract* utilities).
+ * Importance signals for message scoring
  */
 const IMPORTANCE_SIGNALS = {
-	keywords: Object.values(KEYWORD_PATTERNS),
+	// Keyword patterns with weights
+	keywords: [
+		{
+			pattern: /\b(?:GOAL|OBJECTIVE|TARGET|WANT TO|TRYING TO)\b:?\s*(.+)/i,
+			weight: 1.0,
+		},
+		{
+			pattern: /\b(?:DECISION|DECIDED|CHOSE|SELECTED)\b:?\s*(.+)/i,
+			weight: 0.95,
+		},
+		{
+			pattern: /\b(?:ERROR|FAILED|BUG|ISSUE|PROBLEM|CRASH)\b:?\s*(.+)/i,
+			weight: 0.9,
+		},
+		{
+			pattern: /\b(?:SOLUTION|FIX|RESOLVED|FIXED|WORKAROUND)\b:?\s*(.+)/i,
+			weight: 0.85,
+		},
+		{
+			pattern: /\b(?:DISCOVERED|FOUND|LEARNED|INSIGHT|REALIZED)\b:?\s*(.+)/i,
+			weight: 0.8,
+		},
+		{
+			pattern: /\b(?:CONSTRAINT|REQUIREMENT|REQUIRED|MUST)\b:?\s*(.+)/i,
+			weight: 0.75,
+		},
+		{ pattern: /\b(?:FILE|PATH|DIRECTORY|MODULE)\b:?\s*(.+)/i, weight: 0.7 },
+		{
+			pattern:
+				/\b(?:ADDED|REMOVED|MODIFIED|CHANGED|UPDATED|CREATED|DELETED)\b:?\s*(.+)/i,
+			weight: 0.65,
+		},
+		{
+			pattern: /\b(?:TODO|NEXT|SHOULD|PLAN TO|NEED TO)\b:?\s*(.+)/i,
+			weight: 0.6,
+		},
+	],
 
+	// Content type multipliers
 	contentMultipliers: {
-		codeBlock: 1.3,
-		filePath: 1.2,
-		toolCall: 1.15,
-		errorLog: 1.25,
-		multiLine: 0.9,
+		codeBlock: 1.3, // Code is hard to reconstruct
+		filePath: 1.2, // Files track project state
+		toolCall: 1.15, // Actions contain key state
+		errorLog: 1.25, // Errors need tracking
+		multiLine: 0.9, // Long messages slightly less important
 	},
 };
 
@@ -264,6 +113,7 @@ export class UltraCompactEngine {
 		keepPercentage: number;
 		maxKeepTokens: number;
 		modelName?: string;
+		contextWindow?: number;
 		minMessagesForCompression: number;
 		useLLM: boolean;
 		/** Optional async LLM summarizer: receives conversation text, returns condensed summary */
@@ -294,6 +144,7 @@ export class UltraCompactEngine {
 			keepPercentage: config.keepPercentage ?? 0.3,
 			maxKeepTokens: config.maxKeepTokens ?? 30000,
 			modelName: config.modelName,
+			contextWindow: config.contextWindow,
 			minMessagesForCompression: config.minMessagesForCompression ?? 100,
 			useLLM: config.useLLM ?? false,
 			llmSummarize: config.llmSummarize,
@@ -310,7 +161,8 @@ export class UltraCompactEngine {
 			this.userThresholdOverride = config.thresholdTokens;
 		}
 
-		this.contextWindow = this.detectContextWindow(this.config.modelName);
+		this.contextWindow =
+			this.config.contextWindow ?? this.detectContextWindow(this.config.modelName);
 
 		if (this.userThresholdOverride === undefined) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
@@ -318,70 +170,19 @@ export class UltraCompactEngine {
 	}
 
 	/**
-	 * Detect context window size from model name.
-	 * Normalizes the ID (strips provider prefix, suffixes, date stamps)
-	 * then does exact lookup → substring match → family fallback.
+	 * Return the generic fallback used only when Pi model metadata is unavailable.
 	 */
-	private detectContextWindow(modelName?: string): number {
-		if (!modelName) return MODEL_CONTEXT_WINDOWS["default"];
-
-		const normalized = normalizeModelId(modelName);
-
-		// 1. Exact match
-		if (Object.hasOwn(MODEL_CONTEXT_WINDOWS, normalized)) {
-			return MODEL_CONTEXT_WINDOWS[normalized];
-		}
-
-		// 2. Substring match (both directions)
-		for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
-			if (key === "default") continue;
-			if (normalized.includes(key) || key.includes(normalized)) {
-				return value;
-			}
-		}
-
-		// 3. Family-based fallback
-		return this.detectFromFamily(normalized);
-	}
-
-	private detectFromFamily(normalized: string): number {
-		const familyDefaults: [string, number][] = [
-			["claude", 200000],
-			["gpt-5", 400000],
-			["gpt-4o", 128000],
-			["gpt-4", 8192],
-			["gemini", 1000000],
-			["gemma", 128000],
-			["deepseek", 128000],
-			["llama", 128000],
-			["mistral", 128000],
-			["qwen", 262100],
-			["kimi", 262100],
-			["moonshot", 128000],
-			["minimax", 204800],
-			["glm", 204800],
-			["grok", 131072],
-			["nemotron", 204800],
-			["mimo", 1000000],
-		];
-
-		for (const [family, defaultWindow] of familyDefaults) {
-			if (normalized.includes(family)) return defaultWindow;
-		}
-
-		return MODEL_CONTEXT_WINDOWS["default"];
+	private detectContextWindow(_modelName?: string): number {
+		return DEFAULT_CONTEXT_WINDOW;
 	}
 
 	/**
-	 * Dynamically reconfigure the engine with a new model name.
-	 * If the Pi runtime provides contextWindow, it takes priority over detection.
+	 * Dynamically reconfigure the engine with a new model name
 	 */
-	public reconfigure(modelName?: string, runtimeContextWindow?: number): void {
+	public reconfigure(modelName?: string, contextWindow?: number): void {
 		this.config.modelName = modelName;
-		this.contextWindow =
-			runtimeContextWindow && runtimeContextWindow > 0
-				? runtimeContextWindow
-				: this.detectContextWindow(modelName);
+		this.config.contextWindow = contextWindow;
+		this.contextWindow = contextWindow ?? this.detectContextWindow(modelName);
 		if (this.userThresholdOverride === undefined) {
 			this.config.thresholdTokens = Math.floor(this.contextWindow * 0.8);
 		}
@@ -403,7 +204,8 @@ export class UltraCompactEngine {
 		recommendedKeep: number;
 		modelFamily: string;
 	} {
-		const family = this.detectModelFamily(this.config.modelName || "unknown");
+		const modelFamily = this.config.modelName?.toLowerCase() || "unknown";
+		const family = this.detectModelFamily(modelFamily);
 
 		return {
 			contextWindow: this.contextWindow,
@@ -414,69 +216,27 @@ export class UltraCompactEngine {
 	}
 
 	private detectModelFamily(modelName: string): string {
-		const normalized = normalizeModelId(modelName);
 		const familyPatterns: [string, string][] = [
 			["claude", "anthropic"],
 			["gpt", "openai"],
-			["o1", "openai"],
-			["o3", "openai"],
-			["o4", "openai"],
 			["gemini", "google"],
-			["gemma", "google"],
 			["deepseek", "deepseek"],
 			["llama", "meta"],
 			["mistral", "mistral"],
-			["codestral", "mistral"],
-			["qwen", "alibaba"],
-			["kimi", "moonshot"],
-			["moonshot", "moonshot"],
-			["minimax", "minimax"],
-			["glm", "zhipu"],
-			["grok", "xai"],
-			["nemotron", "nvidia"],
-			["mimo", "xiaomi"],
-			["big-pickle", "opencode"],
 		];
 
 		for (const [pattern, family] of familyPatterns) {
-			if (normalized.includes(pattern)) return family;
+			if (modelName.includes(pattern)) return family;
 		}
 
 		return "unknown";
 	}
 
 	/**
-	 * Get the output headroom (tokens reserved for model response).
-	 */
-	public getOutputHeadroom(): number {
-		return this.config.outputHeadroom;
-	}
-
-	/**
-	 * Whether cache-aware compaction is enabled.
-	 */
-	public isCacheAware(): boolean {
-		return this.config.cacheAware;
-	}
-
-	/**
-	 * Get circuit breaker configuration.
-	 */
-	public getCircuitBreakerConfig(): { maxFailures: number; cooldown: number } {
-		return {
-			maxFailures: this.config.circuitBreakerMaxFailures,
-			cooldown: this.config.circuitBreakerCooldown,
-		};
-	}
-
-	/**
 	 * Get the effective threshold used by shouldCompact
 	 */
 	public shouldCompactDefaultThreshold(): number {
-		const watermarkThreshold = Math.floor(
-			this.contextWindow * this.config.preemptiveWatermark,
-		);
-		return Math.min(this.config.thresholdTokens, watermarkThreshold);
+		return this.config.thresholdTokens;
 	}
 
 	/**
@@ -533,14 +293,14 @@ export class UltraCompactEngine {
 	 * Determine which compaction tier to use based on token usage.
 	 *
 	 * - NONE: < 60% usage — no compaction needed
-	 * - MICRO: 60-95% usage — fast tool-output pruning (no LLM)
-	 * - FULL: >= 95% usage — full structured summarization
+	 * - MICRO: 60-90% usage — fast tool-output pruning (no LLM)
+	 * - FULL: >= 90% usage — full structured summarization
 	 */
 	public determineTier(messages: Message[]): CompactionTier {
 		const tokens = this.estimateTokens(messages);
 		const ratio = this.contextWindow > 0 ? tokens / this.contextWindow : 0;
 
-		if (ratio >= this.config.hardWatermark) return CompactionTier.FULL;
+		if (ratio >= 0.9) return CompactionTier.FULL;
 		if (ratio >= 0.6) return CompactionTier.MICRO;
 		return CompactionTier.NONE;
 	}
@@ -610,19 +370,10 @@ export class UltraCompactEngine {
 
 	/**
 	 * Check if compaction is needed based on token count.
-	 * Uses configured preemptiveWatermark (default 0.7) as the trigger level,
-	 * falling back to the user-configured thresholdTokens if lower.
+	 * Returns true at 60%+ usage (lower threshold for micro-compact).
 	 */
 	public shouldCompact(currentTokens: number): boolean {
-		const watermarkThreshold = Math.floor(
-			this.contextWindow * this.config.preemptiveWatermark,
-		);
-		// Use the lower of configured threshold and watermark-based threshold
-		const effectiveThreshold = Math.min(
-			this.config.thresholdTokens,
-			watermarkThreshold,
-		);
-		return currentTokens >= effectiveThreshold;
+		return currentTokens >= Math.floor(this.contextWindow * 0.6);
 	}
 
 	public async generateSummary(
@@ -630,15 +381,26 @@ export class UltraCompactEngine {
 		previousSummary?: string,
 	): Promise<CompactionResult> {
 		if (!Array.isArray(messages) || messages.length === 0) {
-			return emptyCompactionResult(previousSummary);
+			return {
+				summary: previousSummary || "",
+				tokensBefore: 0,
+				tokensAfter: 0,
+				compressionRatio: 1,
+				readFiles: [],
+				modifiedFiles: [],
+				timestamp: Date.now(),
+			};
 		}
 
 		// Phase 1: Pre-processing (no LLM)
 		const preprocessed = this.preprocessMessages(messages);
 
 		// Phase 2: Classification
-		const { protected: protectedMsgs, compressible } =
-			this.classifyMessages(preprocessed);
+		const {
+			protected: protectedMsgs,
+			compressible,
+			discardable: _discardable,
+		} = this.classifyMessages(preprocessed);
 
 		const tokensBefore = this.estimateTokens(messages);
 		const targetBudget = this.calculateKeepTokens(tokensBefore);
@@ -675,6 +437,9 @@ export class UltraCompactEngine {
 		}
 
 		// Phase 4: Calculate metrics
+
+		// Phase 5: Calculate metrics
+		const protectedTokens = this.estimateTokens(protectedMsgs);
 		const summaryTokens = this.estimateTokens([
 			{
 				id: "summary",
@@ -683,9 +448,7 @@ export class UltraCompactEngine {
 				timestamp: Date.now(),
 			},
 		]);
-		// tokensAfter represents only the summary output size (not protected messages,
-		// which are retained by the caller). This ensures compressionRatio < 1.
-		const tokensAfter = summaryTokens;
+		const tokensAfter = protectedTokens + summaryTokens;
 
 		const fileOps = this.extractFileOperations(messages);
 
@@ -923,14 +686,10 @@ export class UltraCompactEngine {
 			compressible.push(msg);
 		}
 
-		// Protect recent messages by token budget (scale with context window, min 5K, max 50K)
-		const recentBudget = Math.max(
-			5000,
-			Math.min(50000, Math.floor(this.contextWindow * 0.15)),
-		);
+		// Protect recent messages by token budget
 		const recentProtected = this.protectRecentByTokenBudget(
 			compressible,
-			recentBudget,
+			20000,
 		);
 		const remainingCompressible = compressible.filter(
 			(msg) => !recentProtected.includes(msg),
@@ -1039,47 +798,82 @@ export class UltraCompactEngine {
 
 		let totalStripped = 0;
 
-		const evictionSteps: Array<{
-			level: EvictionLevel;
-			apply: (msgs: Message[]) => Message[];
-		}> = [
-			{
-				level: EvictionLevel.STRIP_REASONING,
-				apply: (msgs) => this.stripReasoningBlocks(msgs),
-			},
-			{
-				level: EvictionLevel.STRIP_BULK_OUTPUT,
-				apply: (msgs) => this.stripBulkToolOutputs(msgs),
-			},
-			{
-				level: EvictionLevel.STRIP_ARTIFACTS,
-				apply: (msgs) => this.stripArtifactToolOutputs(msgs),
-			},
-			{
-				level: EvictionLevel.FULL_REMOVAL,
-				apply: (msgs) => this.removeOldCompressibleMessages(msgs, tokenBudget),
-			},
-		];
-
-		for (const step of evictionSteps) {
-			if (maxLevel < step.level) break;
-
+		// ── Level 1: Strip reasoning blocks from assistant messages ──────────
+		if (maxLevel >= EvictionLevel.STRIP_REASONING) {
 			const before = this.estimateTokens(current);
-			current = step.apply(current);
+			current = this.stripReasoningBlocks(current);
 			const after = this.estimateTokens(current);
 			const saved = before - after;
 			totalStripped += saved;
 
-			if (after <= tokenBudget || step.level === EvictionLevel.FULL_REMOVAL) {
+			if (after <= tokenBudget) {
 				return {
 					messages: current,
 					stats: {
 						messagesStripped: saved,
 						tokensSaved: saved,
-						levelUsed: step.level,
+						levelUsed: EvictionLevel.STRIP_REASONING,
 					},
 				};
 			}
+		}
+
+		// ── Level 2: Strip bulk tool outputs (>100 lines, >5000 chars) ──────
+		if (maxLevel >= EvictionLevel.STRIP_BULK_OUTPUT) {
+			const before = this.estimateTokens(current);
+			current = this.stripBulkToolOutputs(current);
+			const after = this.estimateTokens(current);
+			const saved = before - after;
+			totalStripped += saved;
+
+			if (after <= tokenBudget) {
+				return {
+					messages: current,
+					stats: {
+						messagesStripped: saved,
+						tokensSaved: saved,
+						levelUsed: EvictionLevel.STRIP_BULK_OUTPUT,
+					},
+				};
+			}
+		}
+
+		// ── Level 3: Strip all non-error tool outputs ────────────────────────
+		if (maxLevel >= EvictionLevel.STRIP_ARTIFACTS) {
+			const before = this.estimateTokens(current);
+			current = this.stripArtifactToolOutputs(current);
+			const after = this.estimateTokens(current);
+			const saved = before - after;
+			totalStripped += saved;
+
+			if (after <= tokenBudget) {
+				return {
+					messages: current,
+					stats: {
+						messagesStripped: saved,
+						tokensSaved: saved,
+						levelUsed: EvictionLevel.STRIP_ARTIFACTS,
+					},
+				};
+			}
+		}
+
+		// ── Level 4: Full message removal (oldest non-protected first) ────────
+		if (maxLevel >= EvictionLevel.FULL_REMOVAL) {
+			const before = this.estimateTokens(current);
+			current = this.removeOldCompressibleMessages(current, tokenBudget);
+			const after = this.estimateTokens(current);
+			const saved = before - after;
+			totalStripped += saved;
+
+			return {
+				messages: current,
+				stats: {
+					messagesStripped: saved,
+					tokensSaved: saved,
+					levelUsed: EvictionLevel.FULL_REMOVAL,
+				},
+			};
 		}
 
 		return {
@@ -1101,14 +895,10 @@ export class UltraCompactEngine {
 			if (msg.role !== "assistant") return msg;
 			if (!Array.isArray(msg.content)) return msg;
 
-			const hasThinking = msg.content.some(
-				(b) => (b as { type?: string })?.type === "thinking",
-			);
+			const hasThinking = msg.content.some((b: any) => b?.type === "thinking");
 			if (!hasThinking) return msg;
 
-			const newContent = msg.content.filter(
-				(b) => (b as { type?: string })?.type !== "thinking",
-			);
+			const newContent = msg.content.filter((b: any) => b?.type !== "thinking");
 			// If all content was thinking, keep a placeholder
 			if (newContent.length === 0) {
 				return { ...msg, content: "[reasoning stripped]" };
@@ -1153,7 +943,17 @@ export class UltraCompactEngine {
 			if (msg.role !== "tool") return msg;
 			const content = messageContent(msg);
 
-			if (containsErrorIndicators(content)) {
+			// Preserve error outputs
+			if (
+				content.includes("Error:") ||
+				content.includes("error:") ||
+				content.includes("failed") ||
+				content.includes("Failed") ||
+				content.includes("exit code") ||
+				content.includes("exit status") ||
+				content.includes("SyntaxError") ||
+				content.includes("TypeError")
+			) {
 				return msg;
 			}
 
@@ -1197,14 +997,14 @@ export class UltraCompactEngine {
 
 		// Keep removing from oldest until budget is satisfied
 		const result = [...protectedMsgs];
-		let runningTokens = this.estimateTokens(result);
+		const initialTokens = this.estimateTokens(result);
 
 		// Add back candidates from newest to oldest while staying under budget
 		for (let i = candidates.length - 1; i >= 0; i--) {
 			const candidateTokens = this.estimateTokens([candidates[i]]);
-			if (runningTokens + candidateTokens <= tokenBudget) {
+			if (initialTokens + candidateTokens <= tokenBudget) {
 				result.push(candidates[i]);
-				runningTokens += candidateTokens;
+				// Need to re-check budget with newly added message
 			}
 		}
 
@@ -1232,12 +1032,8 @@ export class UltraCompactEngine {
 					? `## Previous Context\n${previousSummary}\n\n`
 					: "";
 				return header + "## Summary\n" + llmResult;
-			} catch (error: unknown) {
-				const errMsg =
-					error instanceof Error ? error.message : String(error);
-				console.warn(
-					`[pi-ultra-compact] LLM summarization failed, falling back to heuristic: ${errMsg}`,
-				);
+			} catch {
+				// Fallback to heuristic if LLM fails
 			}
 		}
 		return this.generateStructuredSummary(
@@ -1359,24 +1155,55 @@ export class UltraCompactEngine {
 		return Math.min(1, maxWeight);
 	}
 
-	private extractGoals(messages: Message[]): string[] {
-		return extractByPattern(messages, "goal");
-	}
-
-	private extractDecisions(messages: Message[]): string[] {
-		return extractByPattern(messages, "decision");
-	}
-
 	/**
-	 * Extract errors paired with solutions when both appear in the same message.
+	 * Extract goals from messages
 	 */
-	private extractErrors(messages: Message[]): string[] {
-		const errors: string[] = [];
+	private extractGoals(messages: Message[]): string[] {
+		const goals: string[] = [];
+		const goalPattern =
+			/\b(?:GOAL|OBJECTIVE|TARGET|WANT TO|TRYING TO)\b:?\s*(.+)/i;
 
 		for (const msg of messages) {
 			const text = messageContent(msg);
-			const errorMatch = text.match(KEYWORD_PATTERNS.error.pattern);
-			const solutionMatch = text.match(KEYWORD_PATTERNS.solution.pattern);
+			const match = text.match(goalPattern);
+			if (match) {
+				goals.push(match[1].trim());
+			}
+		}
+
+		return [...new Set(goals)];
+	}
+
+	/**
+	 * Extract decisions from messages
+	 */
+	private extractDecisions(messages: Message[]): string[] {
+		const decisions: string[] = [];
+		const decisionPattern = /\b(?:DECIDED|DECISION|CHOSE|SELECTED)\b:?\s*(.+)/i;
+
+		for (const msg of messages) {
+			const text = messageContent(msg);
+			const match = text.match(decisionPattern);
+			if (match) {
+				decisions.push(match[1].trim());
+			}
+		}
+
+		return [...new Set(decisions)];
+	}
+
+	/**
+	 * Extract errors and solutions from messages
+	 */
+	private extractErrors(messages: Message[]): string[] {
+		const errors: string[] = [];
+		const errorPattern = /\b(?:ERROR|FAILED|BUG|ISSUE|PROBLEM)\b:?\s*(.+)/i;
+		const solutionPattern = /\b(?:SOLUTION|FIX|RESOLVED|FIXED)\b:?\s*(.+)/i;
+
+		for (const msg of messages) {
+			const text = messageContent(msg);
+			const errorMatch = text.match(errorPattern);
+			const solutionMatch = text.match(solutionPattern);
 
 			if (errorMatch) {
 				const error = errorMatch[1].trim();
@@ -1436,8 +1263,22 @@ export class UltraCompactEngine {
 		};
 	}
 
+	/**
+	 * Extract next steps from messages
+	 */
 	private extractNextSteps(messages: Message[]): string[] {
-		return extractByPattern(messages, "next").slice(0, 5);
+		const steps: string[] = [];
+		const stepPattern = /\b(?:NEXT|TODO|SHOULD|PLAN TO|NEED TO)\b:?\s*(.+)/i;
+
+		for (const msg of messages) {
+			const text = messageContent(msg);
+			const match = text.match(stepPattern);
+			if (match) {
+				steps.push(match[1].trim());
+			}
+		}
+
+		return [...new Set(steps)].slice(0, 5);
 	}
 
 	/**
@@ -1471,7 +1312,7 @@ export class UltraCompactEngine {
 	 */
 	private extractTopic(content: string): string {
 		const cleanContent = content.replace(/```[\s\S]*?```/g, "");
-		const topicMatch = cleanContent.match(/\b(?:TOPIC|SUBJECT|ABOUT)\b:?\s*(.+)/i);
+		const topicMatch = cleanContent.match(/(?:TOPIC|SUBJECT|ABOUT):?\s*(.+)/i);
 		if (topicMatch) return topicMatch[1].trim();
 
 		const firstSentence = cleanContent.split(/[.!?]/)[0];

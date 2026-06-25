@@ -1,6 +1,6 @@
 {
   "name": "pi-ultra-compact",
-  "version": "0.9.1",
+  "version": "0.8.0",
   "description": "Advanced compaction extension and skill for Pi with automatic threshold-based compaction and critical context preservation",
   "keywords": [
     "pi-package",
@@ -29,32 +29,23 @@
     ]
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "^0.75.0",
-    "@earendil-works/pi-coding-agent": "^0.75.0",
-    "@earendil-works/pi-tui": "^0.75.0"
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.79.3",
-    "@earendil-works/pi-coding-agent": "^0.79.3",
-    "@earendil-works/pi-tui": "^0.79.3",
-    "@types/jest": "^30.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.61.1",
-    "@typescript-eslint/parser": "^8.61.1",
-    "eslint": "^10.5.0",
-    "eslint-config-prettier": "^10.1.8",
-    "jest": "^30.4.2",
-    "prettier": "^3.8.4",
-    "ts-jest": "^29.4.11",
-    "typescript": "^5.4.0"
+    "@earendil-works/pi-ai": "latest",
+    "@earendil-works/pi-coding-agent": "latest",
+    "@earendil-works/pi-tui": "latest",
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.6"
   },
   "scripts": {
     "build": "tsc",
-    "test": "jest",
+    "test": "vitest run --globals",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint extensions/ tests/",
-    "lint:fix": "eslint extensions/ tests/ --fix",
-    "format": "prettier --write extensions/ tests/",
-    "format:check": "prettier --check extensions/ tests/"
+    "lint": "echo 'Linting not configured yet'",
+    "format": "echo 'Formatting not configured yet'"
   },
   "files": [
     "extensions",
@@ -64,6 +55,6 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=20.0.0"
   }
 }
