@@ -1,24 +1,6 @@
 import { UltraCompactEngine } from "../extensions/engine";
 import type { Message } from "../extensions/types";
-
-/** Helper to create a message */
-function makeMsg(id: string, role: string, content: string): Message {
-	return { id, role: role as any, content, timestamp: Date.now() };
-}
-
-/** Helper to create a message with structured content */
-function makeStructuredMsg(
-	id: string,
-	role: string,
-	blocks: { type: string; text?: string }[],
-): Message {
-	return {
-		id,
-		role: role as any,
-		content: blocks as any,
-		timestamp: Date.now(),
-	};
-}
+import { makeMsg, makeStructuredMsg } from "./helpers";
 
 describe("UltraCompactEngine", () => {
 	// ─── Constructor ───────────────────────────────────────────────
@@ -27,8 +9,10 @@ describe("UltraCompactEngine", () => {
 		it("uses default config when no args", async () => {
 			const engine = new UltraCompactEngine();
 			expect(engine.getContextWindow()).toBe(128000);
+			// Effective threshold = min(thresholdTokens, preemptiveWatermark * contextWindow)
+			// = min(128000*0.8, 128000*0.7) = min(102400, 89600) = 89600
 			expect(engine.shouldCompactDefaultThreshold()).toBe(
-				Math.floor(128000 * 0.8),
+				Math.floor(128000 * 0.7),
 			);
 		});
 
