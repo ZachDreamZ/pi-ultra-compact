@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Migration guide (ROADMAP 5.5)** -- MIGRATION-v1.0.md with upgrade steps, new API reference, troubleshooting, and rollback instructions for v0.x users.
 - **v1.0.0 release** -- all 5 phases of the Structured Improvement Roadmap complete (37/37 tasks). Full feature set across 5 pillars: graduated eviction, generational compaction, preemptive triggering, cache-aware compaction, and circuit breaker with snapshot-rollback.
 - **Utils test coverage (ROADMAP 5.2)** -- 63 tests across all utility functions.
 - **Coverage thresholds raised to 85%** -- actual: 97.66% stmts, 89.14% branches, 100% funcs, 98.23% lines.
