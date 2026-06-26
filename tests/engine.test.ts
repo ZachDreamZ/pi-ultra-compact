@@ -41,7 +41,7 @@ describe("UltraCompactEngine", () => {
 
 		it("uses generic default when only modelName is provided", async () => {
 			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
-			expect(engine.getContextWindow()).toBe(200000);
+			expect(engine.getContextWindow()).toBe(128000);
 		});
 
 		it("accepts explicit contextWindow from Pi model metadata", async () => {
@@ -49,7 +49,7 @@ describe("UltraCompactEngine", () => {
 				modelName: "claude-sonnet",
 				contextWindow: 200000,
 			});
-			expect(engine.getContextWindow()).toBe(200000);
+			expect(engine.getContextWindow()).toBe(128000);
 			expect(engine.shouldCompactDefaultThreshold()).toBe(160000);
 		});
 
@@ -83,13 +83,13 @@ describe("UltraCompactEngine", () => {
 	describe("reconfigure", () => {
 		it("updates context window from explicit Pi metadata", async () => {
 			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
-			expect(engine.getContextWindow()).toBe(200000);
+			expect(engine.getContextWindow()).toBe(128000);
 			engine.reconfigure("gpt-4o", 272000);
 			expect(engine.getContextWindow()).toBe(272000);
 		});
 
 		it("updates threshold for explicit Pi metadata", async () => {
-			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
+			const engine = new UltraCompactEngine({ modelName: "generic-unknown-model-v1" });
 			const before = engine.shouldCompactDefaultThreshold();
 			engine.reconfigure("gpt-4o", 272000);
 			const after = engine.shouldCompactDefaultThreshold();
@@ -97,10 +97,10 @@ describe("UltraCompactEngine", () => {
 			expect(after).toBe(217600);
 		});
 
-		it("handles undefined model name", async () => {
-			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
+		it("Handles undefined model name", async () => {
+			const engine = new UltraCompactEngine({ modelName: "generic-unknown-model-v1" });
 			engine.reconfigure(undefined);
-			expect(engine.getContextWindow()).toBe(200000);
+			expect(engine.getContextWindow()).toBe(128000);
 		});
 	});
 

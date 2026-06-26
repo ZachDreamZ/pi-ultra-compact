@@ -42,7 +42,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run --globals",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'Linting not configured yet'",
     "format": "echo 'Formatting not configured yet'"
