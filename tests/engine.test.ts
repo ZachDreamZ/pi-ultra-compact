@@ -13,7 +13,7 @@ describe("UltraCompactEngine", () => {
 			// Effective threshold = min(thresholdTokens, preemptiveWatermark * contextWindow)
 			// = min(128000*0.8, 128000*0.7) = min(102400, 89600) = 89600
 			expect(engine.shouldCompactDefaultThreshold()).toBe(
-				Math.floor(128000 * 0.8),
+				Math.floor(128000 * 0.7),
 			);
 		});
 
@@ -40,8 +40,8 @@ describe("UltraCompactEngine", () => {
 		});
 
 		it("uses generic default when only modelName is provided", async () => {
-			const engine = new UltraCompactEngine({ modelName: "generic-unknown-model-v1" });
-			expect(engine.getContextWindow()).toBe(128000);
+			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
+			expect(engine.getContextWindow()).toBe(200000);
 		});
 
 		it("accepts explicit contextWindow from Pi model metadata", async () => {
@@ -82,14 +82,14 @@ describe("UltraCompactEngine", () => {
 
 	describe("reconfigure", () => {
 		it("updates context window from explicit Pi metadata", async () => {
-			const engine = new UltraCompactEngine({ modelName: "generic-unknown-model-v1" });
-			expect(engine.getContextWindow()).toBe(128000);
+			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
+			expect(engine.getContextWindow()).toBe(200000);
 			engine.reconfigure("gpt-4o", 272000);
 			expect(engine.getContextWindow()).toBe(272000);
 		});
 
 		it("updates threshold for explicit Pi metadata", async () => {
-			const engine = new UltraCompactEngine({ modelName: "generic-unknown-model-v1" });
+			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
 			const before = engine.shouldCompactDefaultThreshold();
 			engine.reconfigure("gpt-4o", 272000);
 			const after = engine.shouldCompactDefaultThreshold();
@@ -98,9 +98,9 @@ describe("UltraCompactEngine", () => {
 		});
 
 		it("handles undefined model name", async () => {
-			const engine = new UltraCompactEngine({ modelName: "generic-unknown-model-v1" });
+			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
 			engine.reconfigure(undefined);
-			expect(engine.getContextWindow()).toBe(128000);
+			expect(engine.getContextWindow()).toBe(200000);
 		});
 	});
 

@@ -7,15 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Model detection tests fixed** — corrected context window expectations for deepseek-r1 (65536), codestral (256000), o3 (200000), mistral (128000), and llama (128000) to match actual model-specific entries (ROADMAP task 1.2/1.3 follow-up).
+
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
+
+- **maxEvictionLevel config cap verified** — added 5 tests confirming `evictGradually` respects the `maxEvictionLevel` config cap at every level (1-4), including end-to-end verification through `generateSummary` (ROADMAP task 2.4).
+
+### Added
+
+- **JSDoc comments for all public methods in engine.ts** — added full JSDoc to the constructor (16 config params documented), `generateSummary`, and enhanced 7 existing JSDoc blocks with `@param` and `@returns` tags (ROADMAP task 4.1).
+
+- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% -> 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
 - **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
 - **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
 - **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
 - **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
-
-- **JSDoc comments for all public methods in engine.ts** — added full JSDoc to the constructor (16 config params documented), `generateSummary`, and enhanced 7 existing JSDoc blocks with `@param` and `@returns` tags (ROADMAP task 4.1).
-
 ## [0.9.3] - 2026-06-26
 
 ### Fixed
@@ -24,24 +32,29 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 - **194/194 tests green** — the sole failing test (`performs compaction when tokens exceed threshold`) now passes because `shouldCompact()` checks the user-configured threshold first.
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - **`vitest.config.ts`** — added proper Vitest configuration with `globals: true` and test file patterns. Removed `--globals` CLI flag from `package.json` test script. All 194 tests continue to pass.
+- **deepseek-r1, codestral, o3 model entries** — explicit context windows added to `detectContextWindow()` (65536, 256000, 200000 respectively)
+- **opencode/claude-sonnet-4-6 priority fix** — moved to top of model list so it matches before generic claude-sonnet-4
+- **`__resetModuleState()`** — exported function for Vitest test isolation between suites
+
+### Fixed
+
+- **preemptive watermark cap** — `shouldCompactDefaultThreshold()` now applies `preemptiveWatermark` cap when context window is auto-detected (not explicitly provided via Pi metadata)
+- **`reconfigure(undefined)` preserves context** — calling `reconfigure()` with no arguments no longer resets to the default context window
+- **Module-level circuit breaker state** — `compactionFailures`, `breakerTrippedAtTurn`, and `currentTurn` promoted to module scope so `__resetModuleState()` can reset them
+- **18 test failures resolved** — updated expectations for expanded model detection (claude -> 200K, deepseek-r1 -> 65536, codestral -> 256000, o3 -> 200000), fixed family fallback matching (`includes` not `===`), and aligned notify calls with new notification logic
+
+### Changed
+
+- **Family fallback matching** — reverted to `name.includes(family)` (was incorrectly changed to `===`)
+- **Notification messages capitalized** — "Starting Ultra-compact compaction..." for consistency
 
 
 
 ## [0.9.0] - 2026-06-20
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - **Model ID normalization** — new `normalizeModelId()` function strips provider prefixes (`opencode/`, `openai/`, `anthropic/`, etc.), trailing suffixes (`-free`, `-latest`, `-preview`, `-exp`, `-beta`, `-online`), and date stamps (e.g. `-20250610`) before lookup
 - **70+ model entries** — expanded `MODEL_CONTEXT_WINDOWS` from ~30 to 70+ entries:
@@ -71,11 +84,6 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 ## [0.8.0] - 2026-06-17
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - **Graduated Eviction (4 levels)** — strips content incrementally instead of all-or-nothing:
   - Level 1: Strip assistant reasoning/thinking blocks
@@ -118,11 +126,6 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 ## [0.7.0] - 2026-06-17
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - **Compact section templates** — restructured summary sections use shorter headers (`## Decisions` instead of `## Key Decisions`, `## Errors` instead of `## Errors & Solutions`, `## Files` instead of `## File Operations`, `## Next` instead of `## Next Steps`)
 - **Compact file operations** — file ops displayed in compact pipe-separated format (`R: file1.ts | M: file2.ts`) instead of multi-line bullet lists
@@ -147,11 +150,6 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 ## [0.6.0] - 2026-06-16
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - **Smart model switching** — `modelThresholdMemory` Map stores per-model thresholds; switching to a previously-used model restores its threshold instantly
 - **userThresholdOverride field** — custom thresholdTokens explicitly tracked and preserved across model switches (replaces fragile flag-based approach)
@@ -183,11 +181,6 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 ## [0.5.0] - 2026-06-14
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - **53-test Jest suite** — comprehensive coverage for constructor, context detection, reconfigure, shouldCompact, extractCriticalInfo, generateSummary, model families, edge cases
 - **Null safety guards** — all message-consuming methods (generateSummary, extractCriticalInfo, compressConversation, extractFileOperations, estimateTokens) guard against null/undefined arrays
@@ -281,11 +274,6 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 ## [0.4.0] - 2025-06-14
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - Comprehensive model context window support (200+ models)
 - Auto-detect model family for threshold calculation
@@ -308,11 +296,6 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 ## [0.3.0] - 2024-06-13
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - `/ultracompact` command for manual compaction
 - Automatic threshold-based compaction (default: 100k tokens)
@@ -353,11 +336,6 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 ## [0.1.1] - 2024-06-13
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - Professional README with no emojis
 - License, contributing, and changelog files
@@ -365,11 +343,6 @@ n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that
 ## [0.1.0] - 2024-06-13
 
 ### Added
-n- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% → 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
-- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
-- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
-- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
-- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
 
 - Initial release
 - Ultra-compact compression level with maximum information density

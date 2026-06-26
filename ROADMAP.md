@@ -49,7 +49,7 @@
 | 2.1 | `[P1]` | Implement Level 3 eviction (strip artifact tool outputs) | None | `[x]` |
 | 2.2 | `[P1]` | Implement Level 4 eviction (remove old compressible messages) | 2.1 | `[x]` |
 | 2.3 | `[P2]` | Add test coverage for all 4 eviction levels with edge cases | 2.2 | `[x]` |
-| 2.4 | `[P2]` | Verify eviction respects `maxEvictionLevel` config cap | 2.3 | `[ ]` |
+| 2.4 | `[P2]` | Verify eviction respects `maxEvictionLevel` config cap | 2.3 | `[x]` |
 
 ### Pillar 2: Generational Compaction ✅ COMPLETE
 
@@ -140,8 +140,8 @@
 | Phase | Total | Done | Pending | Progress |
 |-------|-------|------|---------|----------|
 | 1. Stability & Tests | 6 | 6 | 0 | 100% |
-| 2. Core Features | 16 | 12 | 4 | 75% |
+| 2. Core Features | 16 | 13 | 3 | 81% |
 | 3. Test Coverage | 4 | 0 | 4 | 0% |
 | 4. Documentation | 6 | 1 | 5 | 17% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **19** | **18** | **51%** |
+| **Total** | **37** | **20** | **17** | **54%** |

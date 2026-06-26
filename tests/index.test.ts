@@ -7,9 +7,10 @@ import { vi } from "vitest";
  * preemptive trigger, cache-aware compaction, lossy truncation fallback.
  */
 
-import piUltraCompact, { UltraCompactEngine } from "../extensions/index";
+import piUltraCompact, { UltraCompactEngine, __resetModuleState } from "../extensions/index";
 import type { UltraCompactConfig } from "../extensions/types";
 
+beforeEach(() => {    __resetModuleState();});
 // ─── Helpers ──────────────────────────────────────────────────────
 
 function makePiMock(overrides: Record<string, any> = {}) {
@@ -82,11 +83,14 @@ describe("piUltraCompact factory", () => {
 		).not.toThrow();
 	});
 
-	it("throws when pi.registerCommand is unavailable", () => {
+	it("logs warning and returns when pi.registerCommand is unavailable", () => {
+		const consoleError = vi.spyOn(console, "error").mockImplementation();
 		const pi = { model: "gpt-4o" }; // no registerCommand
-		expect(() => piUltraCompact(pi)).toThrow(
-			"pi-ultra-compact requires pi.registerCommand to register /ultracompact",
+		piUltraCompact(pi);
+		expect(consoleError).toHaveBeenCalledWith(
+			expect.stringContaining("pi.registerCommand is unavailable"),
 		);
+		consoleError.mockRestore();
 	});
 
 	it("handles pi without model property", () => {
@@ -134,8 +138,10 @@ describe("/ultracompact command handler", () => {
 			ui: { notify: vi.fn() },
 		};
 		handler({}, ctx);
-		// No notification before compaction in current implementation
-		expect(ctx.compact).toHaveBeenCalled();
+		expect(ctx.ui.notify).toHaveBeenCalledWith(
+			"Starting Ultra-compact compaction...",
+			"info",
+		);
 	});
 
 	it("warns when ctx.compact is unavailable", () => {
@@ -143,12 +149,12 @@ describe("/ultracompact command handler", () => {
 		piUltraCompact(pi);
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
-		const ctx = { ui: { notify: vi.fn() } };
-		handler({}, ctx);
-		expect(ctx.ui.notify).toHaveBeenCalledWith(
-			"Ultra-compact unavailable: ctx.compact is missing",
-			"error",
+		const consoleWarn = vi.spyOn(console, "warn").mockImplementation();
+		handler({}, {}); // no ctx.compact
+		expect(consoleWarn).toHaveBeenCalledWith(
+			expect.stringContaining("ctx.compact unavailable"),
 		);
+		consoleWarn.mockRestore();
 	});
 
 	it("warns when ctx is null", () => {
@@ -156,9 +162,12 @@ describe("/ultracompact command handler", () => {
 		piUltraCompact(pi);
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
-		// null ctx: guard catches it, notify silently does nothing
-		const result = handler({}, null);
-		expect(result).toBeUndefined();
+		const consoleWarn = vi.spyOn(console, "warn").mockImplementation();
+		handler({}, null);
+		expect(consoleWarn).toHaveBeenCalledWith(
+			expect.stringContaining("ctx.compact unavailable"),
+		);
+		consoleWarn.mockRestore();
 	});
 
 	it("calls onComplete callback on success", () => {
@@ -171,8 +180,10 @@ describe("/ultracompact command handler", () => {
 			ui: { notify: vi.fn() },
 		};
 		handler({}, ctx);
-		// No completion notification in current implementation
-		expect(ctx.compact).toHaveBeenCalled();
+		expect(ctx.ui.notify).toHaveBeenCalledWith(
+			"Ultra-compact compaction complete!",
+			"info",
+		);
 	});
 
 	it("calls onError callback on failure", () => {
@@ -196,12 +207,17 @@ describe("/ultracompact command handler", () => {
 		piUltraCompact(pi);
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
+		const consoleError = vi.spyOn(console, "error").mockImplementation();
 		const ctx = {
 			compact: vi.fn((opts: any) => opts.onError(new Error("test error"))),
 			// no ui
 		};
-		// notify() silently does nothing when ctx.ui.notify is missing
 		handler({}, ctx);
+		expect(consoleError).toHaveBeenCalledWith(
+			expect.stringContaining("Ultra-compact failed:"),
+			"test error",
+		);
+		consoleError.mockRestore();
 	});
 
 	it("works without ctx.ui.notify", () => {
@@ -228,11 +244,15 @@ describe("model_select event", () => {
 		)?.[1];
 		expect(modelSelectHandler).toBeDefined();
 
-		// Current implementation updates internal state silently
+		const consoleLog = vi.spyOn(console, "log").mockImplementation();
 		modelSelectHandler!(
 			{ model: { id: "claude-4.5-opus", contextWindow: 200000 } },
 			{},
 		);
+		expect(consoleLog).toHaveBeenCalledWith(
+			expect.stringContaining("Model updated: claude-4.5-opus"),
+		);
+		consoleLog.mockRestore();
 	});
 
 	it("uses model.name if model.id is missing", () => {
@@ -243,11 +263,15 @@ describe("model_select event", () => {
 			(c: any[]) => c[0] === "model_select",
 		)?.[1];
 
-		// Uses model.name as fallback when model.id is missing (silent)
+		const consoleLog = vi.spyOn(console, "log").mockImplementation();
 		modelSelectHandler!(
 			{ model: { name: "gemini-2.5-pro", contextWindow: 1000000 } },
 			{},
 		);
+		expect(consoleLog).toHaveBeenCalledWith(
+			expect.stringContaining("Model updated: gemini-2.5-pro"),
+		);
+		consoleLog.mockRestore();
 	});
 
 	it("does nothing when event.model is missing", () => {
@@ -379,12 +403,12 @@ describe("session_before_compact hook", () => {
 		// Should not throw; model is updated internally
 	});
 
-	it("notifies UI during compaction", async () => {
+	it("does not notify UI during manual compaction (handled by command handler)", async () => {
 		const pi = makePiMock();
 		piUltraCompact(pi, { thresholdTokens: 100 });
 		const handler = getBeforeCompactHandler(pi);
 		const notify = vi.fn();
-		const result = await handler(
+		await handler(
 			{
 				customInstructions: "ultracompact",
 				preparation: {
@@ -397,8 +421,8 @@ describe("session_before_compact hook", () => {
 			},
 			{ ui: { notify } },
 		);
-		// No compaction notification in current implementation
-		expect(result?.compaction?.details?.ultracompact).toBe(true);
+		// Notification moved to handleUltracompactCommand
+		expect(notify).not.toHaveBeenCalled();
 	});
 
 	it("works without ui.notify", async () => {
@@ -492,10 +516,12 @@ describe("circuit breaker", () => {
 			expect(r2).toBeDefined();
 			expect(r2?.compaction?.details?.circuitBreakerEngaged).toBe(true);
 			expect(r2?.compaction?.summary).toContain("circuit breaker engaged");
-			expect(notify).toHaveBeenCalledWith(
-				"Ultra-compact circuit breaker tripped; emergency truncation applied",
-				"error",
+			// Check that at least one call contains the emergency truncation message
+			const emergencyCalls = notify.mock.calls.filter(
+				(c: any[]) => typeof c[0] === "string" && c[0].includes("emergency truncation")
 			);
+			expect(emergencyCalls.length).toBeGreaterThanOrEqual(1);
+			expect(emergencyCalls[0][1]).toBe("error");
 		} finally {
 			UltraCompactEngine.prototype.generateSummary = origGenerateSummary;
 		}
