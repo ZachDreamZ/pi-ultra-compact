@@ -172,7 +172,45 @@ export class UltraCompactEngine {
 	/**
 	 * Return the generic fallback used only when Pi model metadata is unavailable.
 	 */
-	private detectContextWindow(_modelName?: string): number {
+	private detectContextWindow(modelName?: string): number {
+		if (!modelName) return DEFAULT_CONTEXT_WINDOW;
+		const name = modelName.toLowerCase();
+		// Model-specific context windows (2026 models)
+		const modelContexts: [string, number][] = [
+			['claude-sonnet-4', 200000],
+			['claude-opus-4-5', 200000],
+			['claude-opus-4-7', 1000000],
+			['gpt-5.1-codex', 400000],
+			['gpt-5.4-pro', 1100000],
+			['gemini-3.5-flash', 1000000],
+			['deepseek-v4-flash', 200000],
+			['deepseek-v4-flash-free', 200000],
+			['qwen3.6-plus-free', 262100],
+			['kimi-k2.5', 262100],
+			['minimax-m2.7', 204800],
+			['glm-5.1', 204800],
+			['grok-build-0.1', 256000],
+			['nemotron-3-super-free', 204800],
+			['big-pickle', 200000],
+			['mimo-v2.5-pro', 1000000],
+			['opencode/claude-sonnet-4-6', 1000000],
+		];
+		for (const [model, ctx] of modelContexts) {
+			if (name.includes(model)) return ctx;
+		}
+		// Family-level fallbacks
+		const familyContexts: [string, number][] = [
+			['claude', 200000],
+			['gpt', 128000],
+			['gemini', 1000000],
+			['deepseek', 128000],
+			['llama', 128000],
+			['mistral', 128000],
+			['codestral', 128000],
+		];
+		for (const [family, ctx] of familyContexts) {
+			if (name.includes(family)) return ctx;
+		}
 		return DEFAULT_CONTEXT_WINDOW;
 	}
 
@@ -219,10 +257,21 @@ export class UltraCompactEngine {
 		const familyPatterns: [string, string][] = [
 			["claude", "anthropic"],
 			["gpt", "openai"],
+			["o3", "openai"],
 			["gemini", "google"],
 			["deepseek", "deepseek"],
 			["llama", "meta"],
 			["mistral", "mistral"],
+			["codestral", "mistral"],
+			["qwen", "alibaba"],
+			["kimi", "moonshot"],
+			["minimax", "minimax"],
+			["glm", "zhipu"],
+			["grok", "xai"],
+			["nemotron", "nvidia"],
+			["opencode", "opencode"],
+			["big-pickle", "opencode"],
+			["mimo", "xiaomi"],
 		];
 
 		for (const [pattern, family] of familyPatterns) {
