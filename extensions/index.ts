@@ -147,9 +147,7 @@ function handleBeforeCompact(
 		const currentTokens = preparation.tokensBefore;
 		const messagesToCompact = preparation.messagesToSummarize;
 		const isManual = event?.customInstructions === "ultracompact";
-		if (isManual) {
-			notify(ctx, "Starting Ultra-compact compaction...", "info");
-		}
+		// Manual trigger already notified by handleUltracompactCommand
 
 		if (!Array.isArray(messagesToCompact) || messagesToCompact.length === 0) {
 			return undefined;

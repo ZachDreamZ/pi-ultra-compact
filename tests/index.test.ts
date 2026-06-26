@@ -403,7 +403,7 @@ describe("session_before_compact hook", () => {
 		// Should not throw; model is updated internally
 	});
 
-	it("notifies UI during compaction", async () => {
+	it("does not notify UI during manual compaction (handled by command handler)", async () => {
 		const pi = makePiMock();
 		piUltraCompact(pi, { thresholdTokens: 100 });
 		const handler = getBeforeCompactHandler(pi);
@@ -421,10 +421,8 @@ describe("session_before_compact hook", () => {
 			},
 			{ ui: { notify } },
 		);
-		expect(notify).toHaveBeenCalledWith(
-			expect.stringContaining("Ultra-compact"),
-			"info",
-		);
+		// Notification moved to handleUltracompactCommand
+		expect(notify).not.toHaveBeenCalled();
 	});
 
 	it("works without ui.notify", async () => {
