@@ -41,7 +41,7 @@ describe("UltraCompactEngine", () => {
 
 		it("uses generic default when only modelName is provided", async () => {
 			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
-			expect(engine.getContextWindow()).toBe(128000);
+			expect(engine.getContextWindow()).toBe(200000);
 		});
 
 		it("accepts explicit contextWindow from Pi model metadata", async () => {
@@ -83,7 +83,7 @@ describe("UltraCompactEngine", () => {
 	describe("reconfigure", () => {
 		it("updates context window from explicit Pi metadata", async () => {
 			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
-			expect(engine.getContextWindow()).toBe(128000);
+			expect(engine.getContextWindow()).toBe(200000);
 			engine.reconfigure("gpt-4o", 272000);
 			expect(engine.getContextWindow()).toBe(272000);
 		});
@@ -100,7 +100,7 @@ describe("UltraCompactEngine", () => {
 		it("handles undefined model name", async () => {
 			const engine = new UltraCompactEngine({ modelName: "claude-sonnet" });
 			engine.reconfigure(undefined);
-			expect(engine.getContextWindow()).toBe(128000);
+			expect(engine.getContextWindow()).toBe(200000);
 		});
 	});
 

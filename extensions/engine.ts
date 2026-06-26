@@ -177,6 +177,7 @@ export class UltraCompactEngine {
 		const name = modelName.toLowerCase();
 		// Model-specific context windows (2026 models)
 		const modelContexts: [string, number][] = [
+			['opencode/claude-sonnet-4-6', 1000000],
 			['claude-sonnet-4', 200000],
 			['claude-opus-4-5', 200000],
 			['claude-opus-4-7', 1000000],
@@ -185,6 +186,9 @@ export class UltraCompactEngine {
 			['gemini-3.5-flash', 1000000],
 			['deepseek-v4-flash', 200000],
 			['deepseek-v4-flash-free', 200000],
+			['deepseek-r1', 65536],
+			['codestral', 256000],
+			['o3', 200000],
 			['qwen3.6-plus-free', 262100],
 			['kimi-k2.5', 262100],
 			['minimax-m2.7', 204800],
@@ -193,7 +197,6 @@ export class UltraCompactEngine {
 			['nemotron-3-super-free', 204800],
 			['big-pickle', 200000],
 			['mimo-v2.5-pro', 1000000],
-			['opencode/claude-sonnet-4-6', 1000000],
 		];
 		for (const [model, ctx] of modelContexts) {
 			if (name.includes(model)) return ctx;
@@ -218,6 +221,8 @@ export class UltraCompactEngine {
 	 * Dynamically reconfigure the engine with a new model name
 	 */
 	public reconfigure(modelName?: string, contextWindow?: number): void {
+		// Preserve current context when called without arguments
+		if (modelName === undefined && contextWindow === undefined) return;
 		this.config.modelName = modelName;
 		this.config.contextWindow = contextWindow;
 		this.contextWindow = contextWindow ?? this.detectContextWindow(modelName);
@@ -285,7 +290,13 @@ export class UltraCompactEngine {
 	 * Get the effective threshold used by shouldCompact
 	 */
 	public shouldCompactDefaultThreshold(): number {
-		return this.config.thresholdTokens;
+		// Apply preemptive watermark cap only when context window was auto-detected
+		// (not explicitly provided via Pi model metadata or constructor config)
+		if (this.config.contextWindow !== undefined) {
+			return this.config.thresholdTokens;
+		}
+		const preemptiveCap = Math.floor(this.config.preemptiveWatermark * this.contextWindow);
+		return Math.min(this.config.thresholdTokens, preemptiveCap);
 	}
 
 	/**

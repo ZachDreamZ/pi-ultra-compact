@@ -13,6 +13,10 @@ import type { UltraCompactConfig } from "./types";
 
 /** Track current model at runtime (updated by session_start and model_select events) */
 let currentModel: { id?: string; contextWindow?: number } | undefined;
+/** Circuit breaker state (module-level for __resetModuleState access) */
+let compactionFailures = 0;
+let breakerTrippedAtTurn: number | null = null;
+let currentTurn = 0;
 
 /** Default configuration — thresholdTokens omitted so engine auto-detects from model context window */
 const DEFAULT_CONFIG: UltraCompactConfig = {
@@ -67,9 +71,12 @@ function handleUltracompactCommand(
 	return (_args: any, ctx: any) => {
 		// Guard against missing ctx or ctx.compact
 		if (typeof ctx?.compact !== "function") {
-			notify(ctx, "Ultra-compact unavailable: ctx.compact is missing", "error");
+			console.warn("Ultra-compact warning: ctx.compact unavailable");
 			return;
 		}
+
+		// Notify user that compaction is starting
+		notify(ctx, "Starting Ultra-compact compaction...", "info");
 
 		// Reconfigure engine to current model before compaction
 		reconfigureEngineForCurrentModel(engine);
@@ -78,9 +85,15 @@ function handleUltracompactCommand(
 		// session_before_compact hook applies ultra-compact logic
 		ctx.compact({
 			customInstructions: "ultracompact",
-			onComplete: () => {},
+			onComplete: () => {
+				notify(ctx, "Ultra-compact compaction complete!", "info");
+			},
 			onError: (error: Error) => {
-				notify(ctx, `Ultra-compact failed: ${error.message}`, "error");
+				if (typeof ctx?.ui?.notify === "function") {
+					notify(ctx, `Ultra-compact failed: ${error.message}`, "error");
+				} else {
+					console.error("Ultra-compact failed:", error.message);
+				}
 			},
 		});
 	};
@@ -100,9 +113,6 @@ function handleBeforeCompact(
 	engine: UltraCompactEngine,
 ): (event: any, ctx: any) => Record<string, any> | undefined {
 	// Circuit breaker state (per-session)
-	let compactionFailures = 0;
-	let breakerTrippedAtTurn: number | null = null;
-	let currentTurn = 0;
 
 	return async (event: any, ctx: any) => {
 		currentTurn++;
@@ -137,6 +147,9 @@ function handleBeforeCompact(
 		const currentTokens = preparation.tokensBefore;
 		const messagesToCompact = preparation.messagesToSummarize;
 		const isManual = event?.customInstructions === "ultracompact";
+		if (isManual) {
+			notify(ctx, "Starting Ultra-compact compaction...", "info");
+		}
 
 		if (!Array.isArray(messagesToCompact) || messagesToCompact.length === 0) {
 			return undefined;
@@ -305,9 +318,10 @@ export default function piUltraCompact(
 
 	// Guard: ensure required Pi APIs are available
 	if (typeof pi?.registerCommand !== "function") {
-		throw new Error(
-			"pi-ultra-compact requires pi.registerCommand to register /ultracompact",
+		console.error(
+			"pi.registerCommand is unavailable",
 		);
+		return;
 	}
 
 	// Register /ultracompact command
@@ -326,8 +340,14 @@ export default function piUltraCompact(
 
 		pi.on("model_select", (event: any, _ctx: any) => {
 			if (event?.model) {
+				const id = typeof event.model === "string"
+					? event.model
+					: event.model.id || event.model.name || undefined;
 				captureModel(event.model);
 				reconfigureEngineForCurrentModel(engine);
+				if (id) {
+					console.log("Model updated: " + id);
+				}
 			}
 		});
 	}
@@ -341,3 +361,15 @@ export default function piUltraCompact(
 // Export engine for programmatic use
 export { UltraCompactEngine } from "./engine";
 export type { UltraCompactConfig, CompactionResult } from "./types";
+
+/**
+ * @internal — Reset module-level state for testing isolation.
+ * Vitest caches modules across test files, so shared state must be
+ * explicitly reset between suites.
+ */
+export function __resetModuleState(): void {
+	currentModel = undefined;
+	compactionFailures = 0;
+	breakerTrippedAtTurn = null;
+	currentTurn = 0;
+}

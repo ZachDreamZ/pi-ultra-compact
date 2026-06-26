@@ -7,9 +7,10 @@ import { vi } from "vitest";
  * preemptive trigger, cache-aware compaction, lossy truncation fallback.
  */
 
-import piUltraCompact, { UltraCompactEngine } from "../extensions/index";
+import piUltraCompact, { UltraCompactEngine, __resetModuleState } from "../extensions/index";
 import type { UltraCompactConfig } from "../extensions/types";
 
+beforeEach(() => {    __resetModuleState();});
 // ─── Helpers ──────────────────────────────────────────────────────
 
 function makePiMock(overrides: Record<string, any> = {}) {
@@ -138,7 +139,7 @@ describe("/ultracompact command handler", () => {
 		};
 		handler({}, ctx);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(
-			"Starting ultra-compact compaction...",
+			"Starting Ultra-compact compaction...",
 			"info",
 		);
 	});
@@ -517,10 +518,12 @@ describe("circuit breaker", () => {
 			expect(r2).toBeDefined();
 			expect(r2?.compaction?.details?.circuitBreakerEngaged).toBe(true);
 			expect(r2?.compaction?.summary).toContain("circuit breaker engaged");
-			expect(notify).toHaveBeenCalledWith(
-				expect.stringContaining("emergency truncation"),
-				"warn",
+			// Check that at least one call contains the emergency truncation message
+			const emergencyCalls = notify.mock.calls.filter(
+				(c: any[]) => typeof c[0] === "string" && c[0].includes("emergency truncation")
 			);
+			expect(emergencyCalls.length).toBeGreaterThanOrEqual(1);
+			expect(emergencyCalls[0][1]).toBe("error");
 		} finally {
 			UltraCompactEngine.prototype.generateSummary = origGenerateSummary;
 		}

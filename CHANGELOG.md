@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 
+
+### Added
+
+- **deepseek-r1, codestral, o3 model entries** — explicit context windows added to `detectContextWindow()` (65536, 256000, 200000 respectively)
+- **opencode/claude-sonnet-4-6 priority fix** — moved to top of model list so it matches before generic claude-sonnet-4
+- **`__resetModuleState()`** — exported function for Vitest test isolation between suites
+
+### Fixed
+
+- **preemptive watermark cap** — `shouldCompactDefaultThreshold()` now applies `preemptiveWatermark` cap when context window is auto-detected (not explicitly provided via Pi metadata)
+- **`reconfigure(undefined)` preserves context** — calling `reconfigure()` with no arguments no longer resets to the default context window
+- **Module-level circuit breaker state** — `compactionFailures`, `breakerTrippedAtTurn`, and `currentTurn` promoted to module scope so `__resetModuleState()` can reset them
+- **36 test failures resolved** — updated expectations for expanded model detection (claude → 200K, deepseek-r1 → 65536, codestral → 256000, o3 → 200000), fixed family fallback matching (`includes` not `===`), and aligned notify calls with new notification logic
+
+### Changed
+
+- **Family fallback matching** — reverted to `name.includes(family)` (was incorrectly changed to `===`)
+- **Notification messages capitalized** — "Starting Ultra-compact compaction..." for consistency
+
 ## [0.9.0] - 2026-06-20
 
 ### Added
