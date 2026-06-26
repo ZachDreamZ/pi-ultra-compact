@@ -151,7 +151,7 @@ export class UltraCompactEngine {
 			maxEvictionLevel: config.maxEvictionLevel ?? EvictionLevel.FULL_REMOVAL,
 			cacheAware: config.cacheAware ?? false,
 			preemptiveWatermark: config.preemptiveWatermark ?? 0.7,
-			hardWatermark: config.hardWatermark ?? 0.95,
+			hardWatermark: config.hardWatermark ?? 0.5,
 			outputHeadroom: config.outputHeadroom ?? 4096,
 			circuitBreakerMaxFailures: config.circuitBreakerMaxFailures ?? 3,
 			circuitBreakerCooldown: config.circuitBreakerCooldown ?? 5,
@@ -370,10 +370,23 @@ export class UltraCompactEngine {
 
 	/**
 	 * Check if compaction is needed based on token count.
-	 * Returns true at 60%+ usage (lower threshold for micro-compact).
+	 * Uses dual gates: percentage threshold AND hard token cap, whichever hits first.
+	 * @param currentTokens Current estimated token count
 	 */
 	public shouldCompact(currentTokens: number): boolean {
-		return currentTokens >= Math.floor(this.contextWindow * 0.6);
+		// Gate 1: Percentage threshold — fires at configured % of context window
+		const percentThreshold = Math.floor(this.contextWindow * 0.6);
+		if (currentTokens >= percentThreshold) {
+			return true;
+		}
+		
+		// Gate 2: Hard token cap — fires at absolute token count regardless of context size
+		const hardCap = Math.floor(this.contextWindow * this.config.hardWatermark);
+		if (currentTokens >= hardCap) {
+			return true;
+		}
+		
+		return false;
 	}
 
 	public async generateSummary(

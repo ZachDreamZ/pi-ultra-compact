@@ -46,7 +46,11 @@ export interface UltraCompactConfig {
 	cacheAware?: boolean;
 	/** Soft watermark for preemptive compaction (default 0.70 = 70%) */
 	preemptiveWatermark?: number;
-	/** Hard watermark for reactive compaction fallback (default 0.95) */
+	/**
+	 * Hard cap on context usage (0-1). Compaction fires when tokens reach this
+	 * fraction of the context window, even if the percentage threshold hasn't
+	 * been hit. Default: 0.5 (50%). Set lower for smaller models.
+	 */
 	hardWatermark?: number;
 	/** Tokens to reserve for model output during preemptive check */
 	outputHeadroom?: number;
