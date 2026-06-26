@@ -30,9 +30,9 @@
 | # | Priority | Task | Deps | Status | Version |
 |---|----------|------|------|--------|---------|
 | 1.1 | `[P0]` | Fix jest.fn() → vi.fn() for vitest compatibility | None | `[x]` v0.9.2 | 0.9.2 |
-| 1.2 | `[P1]` | Update model detection database for 2026 models (16 entries) | None | `[ ]` | — |
-| 1.3 | `[P1]` | Add deepseek, codestral, o3 model families to detection | 1.2 | `[ ]` | — |
-| 1.4 | `[P2]` | Fix LLM summarization callback tests (vi.fn mocks) | 1.1 | `[ ]` | — |
+| 1.2 | `[P1]` | Update model detection database for 2026 models (16 entries) | None | `[x]` | 0.9.2 |
+| 1.3 | `[P1]` | Add deepseek, codestral, o3 model families to detection | 1.2 | `[x]` | 0.9.2 |
+| 1.4 | `[P2]` | Fix LLM summarization callback tests (vi.fn mocks) | 1.1 | `[x]` | 0.9.3 |
 | 1.5 | `[P2]` | Add vitest.config.ts with proper globals configuration | None | `[ ]` | — |
 | 1.6 | `[P2]` | Add CI workflow that runs tests on every PR | None | `[ ]` | — |
 
@@ -139,9 +139,9 @@
 
 | Phase | Total | Done | Pending | Progress |
 |-------|-------|------|---------|----------|
-| 1. Stability & Tests | 6 | 3 | 3 | 50% |
+| 1. Stability & Tests | 6 | 4 | 2 | 67% |
 | 2. Core Features | 16 | 2 | 14 | 12% |
 | 3. Test Coverage | 4 | 0 | 4 | 0% |
 | 4. Documentation | 6 | 0 | 6 | 0% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **5** | **32** | **13%** |
+| **Total** | **37** | **6** | **31** | **16%** |
