@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **SECURITY.md (ROADMAP 4.6)** — comprehensive security policy with supported versions, vulnerability reporting process, scope definitions, security-related configuration recommendations, and responsible disclosure guidelines.
 
+- **Performance benchmark tests (ROADMAP 3.4)** — 10 benchmark tests measuring execution time for estimateTokens, extractCriticalInfo, determineTier, microCompact, and evictGradually at 1K and 10K message scales. Results printed as console table and structured JSON marker for CI collection. All operations complete in <50ms at 10K scale.
+
 ### Fixed
 
 - **ROADMAP.md Phase 2 progress** — corrected count from 15/16 to 16/16 (all Phase 2 pillars are complete). Updated overall progress to 81% (30/37 tasks done).
