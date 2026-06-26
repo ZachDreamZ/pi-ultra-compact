@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`shouldCompact` now respects `thresholdTokens`** — added explicit threshold check as Gate 1 before percentage-based gates. Previously, `thresholdTokens` was stored but never consulted by `shouldCompact()`, causing auto-compaction to fail when a global `currentModel` inflated the context window (e.g., after `model_select` events).
 - **194/194 tests green** — the sole failing test (`performs compaction when tokens exceed threshold`) now passes because `shouldCompact()` checks the user-configured threshold first.
 
+### Added
+
+- **`vitest.config.ts`** — added proper Vitest configuration with `globals: true` and test file patterns. Removed `--globals` CLI flag from `package.json` test script. All 194 tests continue to pass.
+
+
 
 ## [0.9.0] - 2026-06-20
 
