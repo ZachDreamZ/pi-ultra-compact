@@ -138,6 +138,10 @@ export class UltraCompactEngine {
 		tokensAfter: number;
 	}> = [];
 
+	/**
+	 * Create a new UltraCompactEngine instance.
+	 * @param config - Configuration with sensible defaults for all fields.
+	 */
 	constructor(config: Partial<UltraCompactEngine["config"]> = {}) {
 		this.config = {
 			thresholdTokens: config.thresholdTokens ?? 100000,
@@ -226,16 +230,18 @@ export class UltraCompactEngine {
 		}
 	}
 
-	/**
-	 * Get the detected context window size
-	 */
+	/**
+	 * Get the detected context window size.
+	 * @returns Context window in tokens
+	 */
 	public getContextWindow(): number {
 		return this.contextWindow;
 	}
 
-	/**
-	 * Get model-specific recommendations
-	 */
+	/**
+	 * Get model-specific compaction recommendations.
+	 * @returns Object with contextWindow, recommendedThreshold, recommendedKeep, modelFamily
+	 */
 	public getModelRecommendations(): {
 		contextWindow: number;
 		recommendedThreshold: number;
@@ -281,16 +287,19 @@ export class UltraCompactEngine {
 		return "unknown";
 	}
 
-	/**
-	 * Get the effective threshold used by shouldCompact
-	 */
+	/**
+	 * Get the effective compaction threshold.
+	 * @returns Token threshold before compaction fires
+	 */
 	public shouldCompactDefaultThreshold(): number {
 		return this.config.thresholdTokens;
 	}
 
-	/**
-	 * Calculate how many tokens to keep
-	 */
+	/**
+	 * Calculate how many tokens to keep after compaction.
+	 * @param currentTokens - Current estimated token count
+	 * @returns Number of tokens to preserve (capped by maxKeepTokens)
+	 */
 	public calculateKeepTokens(currentTokens: number): number {
 		const basedOnPercentage = Math.floor(
 			currentTokens * this.config.keepPercentage,
@@ -298,9 +307,11 @@ export class UltraCompactEngine {
 		return Math.min(basedOnPercentage, this.config.maxKeepTokens);
 	}
 
-	/**
-	 * Extract critical information from messages
-	 */
+	/**
+	 * Extract critical info from messages based on importance scoring.
+	 * @param messages - Messages to analyze
+	 * @returns Object with critical, compressible, and scores map
+	 */
 	public extractCriticalInfo(messages: Message[]): {
 		critical: Message[];
 		compressible: Message[];
@@ -443,6 +454,13 @@ export class UltraCompactEngine {
 		return false;
 	}
 
+	/**
+	 * Generate a structured summary from messages (full compaction).
+	 * Runs pre-process, classify, evict, summarize pipeline.
+	 * @param messages - Messages to compact
+	 * @param previousSummary - Previous compaction summary
+	 * @returns CompactionResult with summary text and metrics
+	 */
 	public async generateSummary(
 		messages: Message[],
 		previousSummary?: string,
@@ -1451,9 +1469,10 @@ export class UltraCompactEngine {
 		return total;
 	}
 
-	/**
-	 * Get compression history
-	 */
+	/**
+	 * Get the compression history.
+	 * @returns Array of compression records
+	 */
 	public getCompressionHistory(): Array<{
 		timestamp: number;
 		summary: string;
@@ -1463,9 +1482,9 @@ export class UltraCompactEngine {
 		return [...this.compressionHistory];
 	}
 
-	/**
-	 * Clear compression history
-	 */
+	/**
+	 * Clear the compression history. Resets iterative summary chain.
+	 */
 	public clearCompressionHistory(): void {
 		this.compressionHistory = [];
 	}
