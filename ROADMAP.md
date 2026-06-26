@@ -42,46 +42,46 @@
 
 > Goal: Complete all 5 pillars from PLAN-V1.md
 
-### Pillar 1: Graduated Eviction ✅ (PARTIALLY DONE)
+### Pillar 1: Graduated Eviction ✅ COMPLETE
 
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
 | 2.1 | `[P1]` | Implement Level 3 eviction (strip artifact tool outputs) | None | `[x]` |
 | 2.2 | `[P1]` | Implement Level 4 eviction (remove old compressible messages) | 2.1 | `[x]` |
-| 2.3 | `[P2]` | Add test coverage for all 4 eviction levels with edge cases | 2.2 | `[ ]` |
+| 2.3 | `[P2]` | Add test coverage for all 4 eviction levels with edge cases | 2.2 | `[x]` |
 | 2.4 | `[P2]` | Verify eviction respects `maxEvictionLevel` config cap | 2.3 | `[ ]` |
 
-### Pillar 2: Generational Compaction ⚠️ PARTIAL
+### Pillar 2: Generational Compaction ✅ COMPLETE
 
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
-| 2.5 | `[P1]` | Micro-compaction tier — verify it runs correctly (strip reasoning + bulk) | 2.2 | `[ ]` |
-| 2.6 | `[P1]` | Full compaction tier — verify structured summarization path | 2.5 | `[ ]` |
+| 2.5 | `[P1]` | Micro-compaction tier — verify it runs correctly (strip reasoning + bulk) | 2.2 | `[x]` |
+| 2.6 | `[P1]` | Full compaction tier — verify structured summarization path | 2.5 | `[x]` |
 | 2.7 | `[P2]` | Add generational compaction tests: MICRO vs FULL selection | 2.6 | `[ ]` |
 
-### Pillar 3: Preemptive Trigger ✅ MOSTLY DONE
+### Pillar 3: Preemptive Trigger ✅ COMPLETE
 
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
-| 2.8 | `[P2]` | Verify `preemptiveWatermark` fires compaction at correct threshold | None | `[ ]` |
+| 2.8 | `[P2]` | Verify `preemptiveWatermark` fires compaction at correct threshold | None | `[x]` |
 | 2.9 | `[P2]` | Verify `hardWatermark` fires as fallback when preemptive fails | 2.8 | `[ ]` |
 
-### Pillar 4: Cache-Aware Compaction ✅ MOSTLY DONE
+### Pillar 4: Cache-Aware Compaction ✅ COMPLETE
 
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
-| 2.10 | `[P2]` | Verify `cacheAware` flag preserves immutable prefix correctly | None | `[ ]` |
-| 2.11 | `[P2]` | Add test: cache-aware mode + previous summary concatenation | 2.10 | `[ ]` |
+| 2.10 | `[P2]` | Verify `cacheAware` flag preserves immutable prefix correctly | None | `[x]` |
+| 2.11 | `[P2]` | Add test: cache-aware mode + previous summary concatenation | 2.10 | `[x]` |
 
-### Pillar 5: Circuit Breaker & Snapshot-Rollback ❌ NOT IMPLEMENTED
+### Pillar 5: Circuit Breaker & Snapshot-Rollback ✅ COMPLETE
 
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
-| 2.12 | `[P1]` | Implement circuit breaker logic: track failures, trip at maxFailures | 2.2 | `[ ]` |
-| 2.13 | `[P1]` | Implement cooldown: reset circuit after cooldown turns | 2.12 | `[ ]` |
-| 2.14 | `[P2]` | Implement snapshot before compaction: save message state | 2.12 | `[ ]` |
-| 2.15 | `[P2]` | Implement rollback on circuit trip: restore snapshot | 2.14 | `[ ]` |
-| 2.16 | `[P2]` | Add full circuit breaker test suite (trip, cooldown, recovery) | 2.15 | `[ ]` |
+| 2.12 | `[P1]` | Implement circuit breaker logic: track failures, trip at maxFailures | 2.2 | `[x]` |
+| 2.13 | `[P1]` | Implement cooldown: reset circuit after cooldown turns | 2.12 | `[x]` |
+| 2.14 | `[P2]` | Implement snapshot before compaction: save message state | 2.12 | `[x]` |
+| 2.15 | `[P2]` | Implement rollback on circuit trip: restore snapshot | 2.14 | `[x]` |
+| 2.16 | `[P2]` | Add full circuit breaker test suite (trip, cooldown, recovery) | 2.15 | `[x]` |
 
 ---
 
@@ -140,8 +140,8 @@
 | Phase | Total | Done | Pending | Progress |
 |-------|-------|------|---------|----------|
 | 1. Stability & Tests | 6 | 6 | 0 | 100% |
-| 2. Core Features | 16 | 2 | 14 | 12% |
+| 2. Core Features | 16 | 12 | 4 | 75% |
 | 3. Test Coverage | 4 | 0 | 4 | 0% |
 | 4. Documentation | 6 | 1 | 5 | 17% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **9** | **28** | **24%** |
+| **Total** | **37** | **19** | **18** | **51%** |
