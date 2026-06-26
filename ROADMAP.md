@@ -104,7 +104,7 @@
 
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
-| 4.1 | `[P1]` | Add JSDoc comments to all public methods in engine.ts | None | `[ ]` |
+| 4.1 | `[P1]` | Add JSDoc comments to all public methods in engine.ts | None | `[x]` |
 | 4.2 | `[P1]` | Create CONTRIBUTING.md with setup instructions | None | `[ ]` |
 | 4.3 | `[P2]` | Add EXAMPLES.md with real-world usage patterns | None | `[ ]` |
 | 4.4 | `[P2]` | Add PULL_REQUEST_TEMPLATE.md | None | `[ ]` |
@@ -142,6 +142,6 @@
 | 1. Stability & Tests | 6 | 6 | 0 | 100% |
 | 2. Core Features | 16 | 2 | 14 | 12% |
 | 3. Test Coverage | 4 | 0 | 4 | 0% |
-| 4. Documentation | 6 | 0 | 6 | 0% |
+| 4. Documentation | 6 | 1 | 5 | 17% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **8** | **29** | **22%** |
+| **Total** | **37** | **9** | **28** | **24%** |
