@@ -1,6 +1,6 @@
 {
   "name": "pi-ultra-compact",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Advanced compaction extension and skill for Pi with automatic threshold-based compaction and critical context preservation",
   "keywords": [
     "pi-package",
@@ -34,11 +34,16 @@
     "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "latest",
-    "@earendil-works/pi-coding-agent": "latest",
-    "@earendil-works/pi-tui": "latest",
+    "@earendil-works/pi-ai": "^0.80.2",
+    "@earendil-works/pi-coding-agent": "^0.80.2",
+    "@earendil-works/pi-tui": "^0.80.2",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
     "@vitest/coverage-v8": "^4.1.9",
-    "typescript": "^5.4.0",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.5",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.6"
   },
   "scripts": {
@@ -47,8 +52,8 @@
     "test:coverage": "vitest run --coverage",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'Linting not configured yet'",
-    "format": "echo 'Formatting not configured yet'"
+    "lint": "eslint \"extensions/**/*.ts\" \"tests/**/*.ts\"",
+    "format": "prettier --check \"extensions/**/*.ts\" \"tests/**/*.ts\""
   },
   "files": [
     "extensions",

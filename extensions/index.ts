@@ -241,7 +241,7 @@ function handleBeforeCompact(
 					},
 				},
 			};
-		} catch (error) {
+		} catch {
 			// ── Circuit breaker ─────────────────────────────────────────
 			compactionFailures++;
 			notify(

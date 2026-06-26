@@ -7,7 +7,7 @@
 
 import { UltraCompactEngine } from "../extensions/engine";
 import type { Message } from "../extensions/types";
-import { EvictionLevel, CompactionTier } from "../extensions/types";
+import { CompactionTier } from "../extensions/types";
 
 function makeMsg(id: string, role: string, content: string): Message {
 	return { id, role: role as any, content, timestamp: Date.now() };
