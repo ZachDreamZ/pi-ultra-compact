@@ -28,3 +28,6 @@ npm-debug.log*
 
 # Pi specific
 .pi/
+
+# Coverage reports
+coverage/

@@ -5,5 +5,19 @@ export default defineConfig({
 		globals: true,
 		include: ["tests/**/*.test.ts"],
 		exclude: ["node_modules", "dist"],
+		coverage: {
+			provider: "v8",
+			enabled: false,
+			include: ["extensions/**/*.ts", "skills/**/*.ts"],
+			exclude: ["**/*.test.ts", "node_modules", "dist"],
+			reporter: ["text", "lcov", "html"],
+			reportsDirectory: "./coverage",
+			thresholds: {
+				statements: 80,
+				branches: 70,
+				functions: 80,
+				lines: 80,
+			},
+		},
 	},
 });

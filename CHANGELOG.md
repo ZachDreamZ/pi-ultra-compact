@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Coverage reporting (ROADMAP 3.3)** — added `@vitest/coverage-v8` provider with v8 (c8) coverage engine. Configured thresholds: 80% statements, 70% branches, 80% functions, 80% lines. Added `test:coverage` and `coverage` npm scripts. CI now runs coverage as a separate job and uploads HTML/lcov reports as artifacts. Current coverage: 94.82% statements, 84.06% branches, 94.04% functions.
+
 - **Edge case tests (ROADMAP 3.1)** — 55 new tests covering empty messages arrays across all public methods, null/undefined content handling, missing fields (id/role/timestamp), invalid array entries, content type edge cases (numeric, boolean, object, image-only blocks), huge inputs (10K messages, 1MB+ content, 1000+ structured blocks), boundary values (NaN, Infinity, negative, MAX_SAFE_INTEGER), constructor extremes, reconfigure edge cases, and empty/whitespace-only string content. Suite grows from 219→274 tests.
 
 - **Fuzz tests (ROADMAP 3.2)** — 11 fuzz tests using random message patterns (roles, content, lengths, structured blocks) across estimateTokens, extractCriticalInfo, evictGradually, determineTier, microCompact, generateSummary, and compact. Covers mixed empty/whitespace, single-character messages, and extreme length variations. Total suite now 285 tests.
