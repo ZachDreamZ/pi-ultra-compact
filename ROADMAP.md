@@ -32,8 +32,8 @@
 | 1.1 | `[P0]` | Fix jest.fn() → vi.fn() for vitest compatibility | None | `[x]` v0.9.2 | 0.9.2 |
 | 1.2 | `[P1]` | Update model detection database for 2026 models (16 entries) | None | `[x]` | 0.9.3 |
 | 1.3 | `[P1]` | Add deepseek, codestral, o3 model families to detection | 1.2 | `[x]` | 0.9.3 |
-| 1.4 | `[P2]` | Fix LLM summarization callback tests (vi.fn mocks) | 1.1 | `[ ]` | — |
-| 1.5 | `[P2]` | Add vitest.config.ts with proper globals configuration | None | `[ ]` | — |
+| 1.4 | `[P2]` | Fix LLM summarization callback tests (vi.fn mocks) | 1.1 | `[x]` | 0.9.3 |
+| 1.5 | `[P2]` | Add vitest.config.ts with proper globals configuration | None | `[x]` | 0.9.3 |
 | 1.6 | `[P2]` | Add CI workflow that runs tests on every PR | None | `[ ]` | — |
 
 ---

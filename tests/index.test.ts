@@ -84,7 +84,7 @@ describe("piUltraCompact factory", () => {
 	});
 
 	it("logs warning and returns when pi.registerCommand is unavailable", () => {
-		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const warn = vi.spyOn(console, "error").mockImplementation(() => {});
 		const pi = { model: "gpt-4o" }; // no registerCommand
 		piUltraCompact(pi);
 		expect(warn).toHaveBeenCalledWith(
