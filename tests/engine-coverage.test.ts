@@ -934,7 +934,7 @@ describe("evictGradually early-return after specific levels", () => {
 			makeMsg("2", "user", "Short question"),
 		];
 		// Budget allows user message but not the full tool output
-		const totalTokens = engine.estimateTokens(msgs);
+		// const totalTokens = engine.estimateTokens(msgs);
 		const userTokens = engine.estimateTokens([msgs[1]]);
 		const result = engine.evictGradually(msgs, userTokens + 800, EvictionLevel.FULL_REMOVAL);
 		// Should stop at level 2 since truncation makes it fit

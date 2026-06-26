@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-27
+
+### Added
+
+- **Phase 6: Maintenance & Developer Tooling** — new ROADMAP phase for ongoing quality-of-life improvements.
+- **.npmignore** — excludes tests/, coverage/, node_modules/, dist/, and config files from npm package.
+- **eslint & prettier as devDependencies** — both tools now installed and wired to `npm run lint` / `npm run format`.
+
+### Changed
+
+- **Package version bumped to 1.1.0** — reflects completed Phase 6 tasks (5/6 done: scripts, changelog, deps, audit, .npmignore).
+- **npm scripts: lint/format now functional** — `npm run lint` runs eslint on extensions/ and tests/; `npm run format` runs prettier --check.
+- **Updated devDependencies** — @earendil-works/pi-* packages 0.79.3 → 0.80.2, typescript 5.4.0 → 5.9.3.
+- **npm audit resolved** — 0 vulnerabilities (was 4 high-severity).
+
+### Fixed
+
+- **Orphan CHANGELOG entries removed** — duplicate "0.8.1" and "0.9.2" stubs at file bottom cleaned up.
+- **Unused-variable lint warnings resolved** — removed/commented 7 unused imports and variables across tests and source.
+
+### Quality Gates
+
+- 337 tests pass, 97%+ coverage, all ops <55ms at 10K scale
+- 0 errors, 25 warnings (all pre-existing `any` type hints)
+- Prettier formatting clean across all source
+
+l).
+
 ## [1.0.0] - 2026-06-27
 
 ### Added
@@ -373,13 +401,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Metadata generation with compression stats
 - `/compression-level` command to toggle levels
 - Compatible with gentle-engram and gentle-pi
-### 0.8.1
-
-- Fixed 27 test failures from jest/vitest API mismatch
-- Replaced jest.fn() with vi.fn() in all test files
-
-### 0.9.2
-
-- Fixed 27 test failures from jest/vitest API mismatch
-- Replaced jest.fn() with vi.fn() in all test files
-

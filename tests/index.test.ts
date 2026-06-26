@@ -8,7 +8,6 @@ import { vi } from "vitest";
  */
 
 import piUltraCompact, { UltraCompactEngine, __resetModuleState } from "../extensions/index";
-import type { UltraCompactConfig } from "../extensions/types";
 
 beforeEach(() => {    __resetModuleState();});
 // ─── Helpers ──────────────────────────────────────────────────────

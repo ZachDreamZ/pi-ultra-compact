@@ -10,7 +10,7 @@
 
 import { UltraCompactEngine } from "../extensions/engine";
 import type { Message } from "../extensions/types";
-import { EvictionLevel, CompactionTier } from "../extensions/types";
+import { EvictionLevel } from "../extensions/types";
 
 const ITERATIONS = 100;
 

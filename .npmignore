@@ -1,0 +1,20 @@
+# Tests and coverage
+tests/
+coverage/
+
+# Source maps and declarations (built from extensions/)
+tsconfig.json
+vitest.config.ts
+eslint.config.mjs
+
+# Dev tooling
+node_modules/
+dist/
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

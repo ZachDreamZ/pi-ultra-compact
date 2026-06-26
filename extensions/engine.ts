@@ -472,7 +472,7 @@ export class UltraCompactEngine {
 		const {
 			protected: protectedMsgs,
 			compressible,
-			discardable: _discardable,
+			// discardable: _discardable,
 		} = this.classifyMessages(preprocessed);
 
 		const tokensBefore = this.estimateTokens(messages);

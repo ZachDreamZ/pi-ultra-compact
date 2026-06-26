@@ -145,3 +145,30 @@
 | 4. Documentation | 6 | 6 | 0 | 100% |
 | 5. v1.0 Release | 5 | 5 | 0 | 100% |
 | **Total** | **37** | **37** | **0** | **100%** |
+
+---
+
+## Phase 6: Maintenance & Developer Tooling (v1.1)
+
+> Goal: Clean tooling, updated dependencies, rigorous quality gates
+
+| # | Priority | Task | Deps | Status | Version |
+|---|----------|------|------|--------|---------|
+| 6.1 | `[P1]` | Fix `lint` and `format` scripts to use eslint/prettier (not echo stubs) | None | `[x]` | 1.1.0 |
+| 6.2 | `[P1]` | Remove orphan CHANGELOG entries (duplicate 0.8.1/0.9.2 at file bottom) | None | `[x]` | 1.1.0 |
+| 6.3 | `[P1]` | Update outdated devDependencies (@pi-* packages 0.79.3 to 0.80.2, typescript) | None | `[x]` | 1.1.0 |
+| 6.4 | `[P2]` | Run npm audit fix for high-severity devDependency vulnerabilities | 6.3 | `[x]` | 1.1.0 |
+| 6.5 | `[P2]` | Add .npmignore to exclude test/coverage from published package | None | `[x]` | 1.1.0 |
+| 6.6 | `[P3]` | Bump version to 1.1.0 with full changelog | 6.1-6.5 | `[ ]` | 1.1.0 |
+
+## Progress Summary
+
+| Phase | Total | Done | Pending | Progress |
+|-------|-------|------|---------|----------|
+| 1. Stability & Tests | 6 | 6 | 0 | 100% |
+| 2. Core Features | 16 | 16 | 0 | 100% |
+| 3. Test Coverage | 4 | 4 | 0 | 100% |
+| 4. Documentation | 6 | 6 | 0 | 100% |
+| 5. v1.0 Release | 5 | 5 | 0 | 100% |
+| 6. Maintenance and Tooling | 6 | 5 | 1 | 83% |
+| **Total** | **43** | **42** | **1** | **98%** |
