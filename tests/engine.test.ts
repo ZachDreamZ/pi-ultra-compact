@@ -107,19 +107,70 @@ describe("UltraCompactEngine", () => {
 	// ─── shouldCompact ────────────────────────────────────────────
 
 	describe("shouldCompact", () => {
-		it("returns false when tokens are under threshold", async () => {
+		it("returns false when tokens are under all gates", async () => {
 			const engine = new UltraCompactEngine({ thresholdTokens: 100000 });
 			expect(engine.shouldCompact(50000)).toBe(false);
 		});
 
-		it("returns true when tokens exceed threshold", async () => {
+		it("returns true when tokens exceed Gate 1 (60% threshold)", async () => {
 			const engine = new UltraCompactEngine({ thresholdTokens: 100000 });
 			expect(engine.shouldCompact(150000)).toBe(true);
 		});
 
-		it("returns true when tokens equal threshold", async () => {
+		it("returns true when tokens equal Gate 1 threshold", async () => {
 			const engine = new UltraCompactEngine({ thresholdTokens: 100000 });
 			expect(engine.shouldCompact(100000)).toBe(true);
+		});
+
+		it("hardWatermark fires as fallback when Gate 1 (60%) doesn't fire — default hardWatermark=0.5", async () => {
+			// Default contextWindow=128000, hardWatermark=0.5 → hardCap=64000
+			// Gate 1 fires at 60%=76800. Tokens at 70000 are below Gate 1 but above hardCap
+			const engine = new UltraCompactEngine({ thresholdTokens: 100000 });
+			expect(engine.shouldCompact(70000)).toBe(true);
+		});
+
+		it("hardWatermark fallback fires with custom low watermark (0.3)", async () => {
+			const engine = new UltraCompactEngine({
+				thresholdTokens: 100000,
+				hardWatermark: 0.3,
+			});
+			// hardCap = 128000 * 0.3 = 38400
+			// 50000 > 38400 → Gate 2 fires even though Gate 1 (60%=76800) doesn't
+			expect(engine.shouldCompact(50000)).toBe(true);
+		});
+
+		it("hardWatermark at 1.0 means Gate 2 never fires — only Gate 1 matters", async () => {
+			const engine = new UltraCompactEngine({
+				thresholdTokens: 100000,
+				hardWatermark: 1.0,
+			});
+			// hardCap = 128000 * 1.0 = 128000 → Gate 2 won't fire below 128K
+			// 70000 < Gate 1 (76800) AND 70000 < hardCap (128000) → false
+			expect(engine.shouldCompact(70000)).toBe(false);
+			// 80000 >= Gate 1 (76800) → true (Gate 1 fires before Gate 2)
+			expect(engine.shouldCompact(80000)).toBe(true);
+		});
+
+		it("tokens below both gates return false", async () => {
+			const engine = new UltraCompactEngine({
+				thresholdTokens: 100000,
+				hardWatermark: 0.4,
+			});
+			// hardCap = 128000 * 0.4 = 51200
+			// Gate 1 = 76800, 45000 < both → false
+			expect(engine.shouldCompact(45000)).toBe(false);
+		});
+
+		it("hardWatermark fallback with explicit context window", async () => {
+			const engine = new UltraCompactEngine({
+				thresholdTokens: 200000,
+				contextWindow: 100000,
+				hardWatermark: 0.45,
+			});
+			// hardCap = 100000 * 0.45 = 45000
+			// Gate 1 = 100000 * 0.6 = 60000
+			// 50000 > 45000 but < 60000 → Gate 2 fires
+			expect(engine.shouldCompact(50000)).toBe(true);
 		});
 	});
 

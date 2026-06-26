@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Hard watermark fallback tests (ROADMAP 2.9)** — 7 new tests verifying that `hardWatermark` fires as fallback when the percentage gate (Gate 1 at 60%) doesn't fire. Covers: default hardWatermark=0.5 fallback, custom low watermark (0.3), high watermark (0.9/1.0 where Gate 1 dominates), tokens below both gates, and explicit context window scenarios. Suite grows from 214→219 tests.
+
 - **Generational compaction MICRO vs FULL selection tests** — 15 new tests covering boundary conditions (exact 60%/90% thresholds), auto-detection via compact(), behavioral verification (MICRO → empty summary, FULL → structured sections), multiple-message accumulation, and context window adaptation (ROADMAP task 2.7).
 
 ### Fixed
