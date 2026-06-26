@@ -94,7 +94,7 @@
 | 3.1 | `[P2]` | Add edge case tests: empty messages, null content, huge inputs | 1.1 | `[x]` | 0.9.5 |
 | 3.2 | `[P2]` | Add fuzz test for compaction with random message patterns | None | `[x]` | 0.9.5 |
 | 3.3 | `[P2]` | Measure and report test coverage (c8/istanbul) | None | `[x]` | 0.9.6 |
-| 3.4 | `[P3]` | Add performance benchmark tests (compaction speed for 1K, 10K msg) | None | `[ ]` |
+| 3.4 | `[P3]` | Add performance benchmark tests (compaction speed for 1K, 10K msg) | None | `[x]` | 0.9.6 |
 
 ---
 
@@ -141,7 +141,7 @@
 |-------|-------|------|---------|----------|
 | 1. Stability & Tests | 6 | 6 | 0 | 100% |
 | 2. Core Features | 16 | 16 | 0 | 100% |
-| 3. Test Coverage | 4 | 3 | 1 | 75% |
+| 3. Test Coverage | 4 | 4 | 0 | 100% |
 | 4. Documentation | 6 | 6 | 0 | 100% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **31** | **6** | **84%** |
+| **Total** | **37** | **32** | **5** | **86%** |
