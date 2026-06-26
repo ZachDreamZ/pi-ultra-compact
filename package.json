@@ -1,6 +1,6 @@
 {
   "name": "pi-ultra-compact",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Advanced compaction extension and skill for Pi with automatic threshold-based compaction and critical context preservation",
   "keywords": [
     "pi-package",
@@ -37,12 +37,15 @@
     "@earendil-works/pi-ai": "latest",
     "@earendil-works/pi-coding-agent": "latest",
     "@earendil-works/pi-tui": "latest",
+    "@vitest/coverage-v8": "^4.1.9",
     "typescript": "^5.4.0",
     "vitest": "^4.1.6"
   },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'Linting not configured yet'",
     "format": "echo 'Formatting not configured yet'"
