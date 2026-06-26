@@ -311,3 +311,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed 27 test failures from jest/vitest API mismatch
 - Replaced jest.fn() with vi.fn() in all test files
 
+### 0.9.2
+
+- Fixed 27 test failures from jest/vitest API mismatch
+- Replaced jest.fn() with vi.fn() in all test files
+
