@@ -306,3 +306,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Metadata generation with compression stats
 - `/compression-level` command to toggle levels
 - Compatible with gentle-engram and gentle-pi
+### 0.8.1
+
+- Fixed 27 test failures from jest/vitest API mismatch
+- Replaced jest.fn() with vi.fn() in all test files
+
