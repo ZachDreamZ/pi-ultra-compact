@@ -34,7 +34,7 @@
 | 1.3 | `[P1]` | Add deepseek, codestral, o3 model families to detection | 1.2 | `[x]` | 0.9.2 |
 | 1.4 | `[P2]` | Fix LLM summarization callback tests (vi.fn mocks) | 1.1 | `[x]` | 0.9.3 |
 | 1.5 | `[P2]` | Add vitest.config.ts with proper globals configuration | None | `[x]` | 0.9.3 |
-| 1.6 | `[P2]` | Add CI workflow that runs tests on every PR | None | `[ ]` | — |
+| 1.6 | `[P2]` | Add CI workflow that runs tests on every PR | None | `[x]` | 0.9.3 |
 
 ---
 
@@ -139,9 +139,9 @@
 
 | Phase | Total | Done | Pending | Progress |
 |-------|-------|------|---------|----------|
-| 1. Stability & Tests | 6 | 5 | 1 | 83% |
+| 1. Stability & Tests | 6 | 6 | 0 | 100% |
 | 2. Core Features | 16 | 2 | 14 | 12% |
 | 3. Test Coverage | 4 | 0 | 4 | 0% |
 | 4. Documentation | 6 | 0 | 6 | 0% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **7** | **30** | **19%** |
+| **Total** | **37** | **8** | **29** | **22%** |
