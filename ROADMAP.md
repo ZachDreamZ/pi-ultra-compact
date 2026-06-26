@@ -64,7 +64,7 @@
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
 | 2.8 | `[P2]` | Verify `preemptiveWatermark` fires compaction at correct threshold | None | `[x]` |
-| 2.9 | `[P2]` | Verify `hardWatermark` fires as fallback when preemptive fails | 2.8 | `[ ]` |
+| 2.9 | `[P2]` | Verify `hardWatermark` fires as fallback when preemptive fails | 2.8 | `[x]` | 0.9.4 |
 
 ### Pillar 4: Cache-Aware Compaction ✅ COMPLETE
 
@@ -140,8 +140,8 @@
 | Phase | Total | Done | Pending | Progress |
 |-------|-------|------|---------|----------|
 | 1. Stability & Tests | 6 | 6 | 0 | 100% |
-| 2. Core Features | 16 | 14 | 2 | 88% |
+| 2. Core Features | 16 | 15 | 1 | 94% |
 | 3. Test Coverage | 4 | 0 | 4 | 0% |
 | 4. Documentation | 6 | 5 | 1 | 83% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **25** | **12** | **68%** |
+| **Total** | **37** | **26** | **11** | **70%** |
