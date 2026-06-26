@@ -139,9 +139,9 @@
 
 | Phase | Total | Done | Pending | Progress |
 |-------|-------|------|---------|----------|
-| 1. Stability & Tests | 6 | 1 | 5 | 16% |
+| 1. Stability & Tests | 6 | 3 | 3 | 50% |
 | 2. Core Features | 16 | 2 | 14 | 12% |
 | 3. Test Coverage | 4 | 0 | 4 | 0% |
 | 4. Documentation | 6 | 0 | 6 | 0% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **3** | **34** | **8%** |
+| **Total** | **37** | **5** | **32** | **13%** |
