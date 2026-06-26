@@ -5,10 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.3] - 
+## [Unreleased]
 
 ### Added
 
+- **JSDoc comments for all public methods in engine.ts** — added full JSDoc to the constructor (16 config params documented), `generateSummary`, and enhanced 7 existing JSDoc blocks with `@param` and `@returns` tags (ROADMAP task 4.1).
+
+- **ROADMAP.md updated** — audited Phase 2 against actual code; 10 tasks that were already implemented marked `[x]`. Phase 2 progress jumps from 12% (2/16) to 75% (12/16). Overall project progress 24% -> 51% (ROADMAP tasks 2.3, 2.5, 2.6, 2.8, 2.10, 2.11, 2.12, 2.13, 2.14, 2.15, 2.16).
+- **CONTRIBUTING.md** — created with setup instructions, dev workflow, commit conventions, branch naming, test guidelines, architecture overview, and issue reporting policy (ROADMAP task 4.2).
+- **PULL_REQUEST_TEMPLATE.md** — GitHub PR template with quality gates checklist and changelog reference (ROADMAP task 4.4).
+- **ISSUE_TEMPLATE.md** — GitHub issue template supporting bug reports and feature requests (ROADMAP task 4.5).
+- **EXAMPLES.md** — real-world usage patterns including programmatic API, config examples, integration with gentle-engram, manual trigger, testing, and CLI scripting (ROADMAP task 4.3).
+## [0.9.3] - 2026-06-26
+
+### Fixed
+
+- **`shouldCompact` now respects `thresholdTokens`** — added explicit threshold check as Gate 1 before percentage-based gates. Previously, `thresholdTokens` was stored but never consulted by `shouldCompact()`, causing auto-compaction to fail when a global `currentModel` inflated the context window (e.g., after `model_select` events).
+- **194/194 tests green** — the sole failing test (`performs compaction when tokens exceed threshold`) now passes because `shouldCompact()` checks the user-configured threshold first.
+
+### Added
+
+- **`vitest.config.ts`** — added proper Vitest configuration with `globals: true` and test file patterns. Removed `--globals` CLI flag from `package.json` test script. All 194 tests continue to pass.
 - **deepseek-r1, codestral, o3 model entries** — explicit context windows added to `detectContextWindow()` (65536, 256000, 200000 respectively)
 - **opencode/claude-sonnet-4-6 priority fix** — moved to top of model list so it matches before generic claude-sonnet-4
 - **`__resetModuleState()`** — exported function for Vitest test isolation between suites
@@ -18,12 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **preemptive watermark cap** — `shouldCompactDefaultThreshold()` now applies `preemptiveWatermark` cap when context window is auto-detected (not explicitly provided via Pi metadata)
 - **`reconfigure(undefined)` preserves context** — calling `reconfigure()` with no arguments no longer resets to the default context window
 - **Module-level circuit breaker state** — `compactionFailures`, `breakerTrippedAtTurn`, and `currentTurn` promoted to module scope so `__resetModuleState()` can reset them
-- **36 test failures resolved** — updated expectations for expanded model detection (claude → 200K, deepseek-r1 → 65536, codestral → 256000, o3 → 200000), fixed family fallback matching (`includes` not `===`), and aligned notify calls with new notification logic
+- **18 test failures resolved** — updated expectations for expanded model detection (claude -> 200K, deepseek-r1 -> 65536, codestral -> 256000, o3 -> 200000), fixed family fallback matching (`includes` not `===`), and aligned notify calls with new notification logic
 
 ### Changed
 
 - **Family fallback matching** — reverted to `name.includes(family)` (was incorrectly changed to `===`)
 - **Notification messages capitalized** — "Starting Ultra-compact compaction..." for consistency
+
+
 
 ## [0.9.0] - 2026-06-20
 

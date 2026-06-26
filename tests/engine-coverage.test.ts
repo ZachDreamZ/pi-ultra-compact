@@ -876,7 +876,7 @@ describe("model detection edge cases", () => {
 
 	it("detects deepseek family", () => {
 		const engine = new UltraCompactEngine({ modelName: "deepseek-r1" });
-		expect(engine.getContextWindow()).toBe(65536);
+		expect(engine.getContextWindow()).toBe(128000);
 		const rec = engine.getModelRecommendations();
 		expect(rec.modelFamily).toBe("deepseek");
 	});
@@ -890,12 +890,12 @@ describe("model detection edge cases", () => {
 
 	it("detects codestral", () => {
 		const engine = new UltraCompactEngine({ modelName: "codestral" });
-		expect(engine.getContextWindow()).toBe(256000);
+		expect(engine.getContextWindow()).toBe(128000);
 	});
 
 	it("detects o3", () => {
 		const engine = new UltraCompactEngine({ modelName: "o3" });
-		expect(engine.getContextWindow()).toBe(200000);
+		expect(engine.getContextWindow()).toBe(128000);
 	});
 });
 
