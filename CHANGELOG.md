@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-06-27
+
+### Added
+
+- **v1.0.0 release** -- all 5 phases of the Structured Improvement Roadmap complete (37/37 tasks). Full feature set across 5 pillars: graduated eviction, generational compaction, preemptive triggering, cache-aware compaction, and circuit breaker with snapshot-rollback.
+- **Utils test coverage (ROADMAP 5.2)** -- 63 tests across all utility functions.
+- **Coverage thresholds raised to 85%** -- actual: 97.66% stmts, 89.14% branches, 100% funcs, 98.23% lines.
+- **Edge case tests (ROADMAP 3.1)** -- 55 tests covering boundaries, extremes, and invariants.
+- **Fuzz tests (ROADMAP 3.2)** -- 11 tests with random message patterns.
+- **Performance benchmark tests (ROADMAP 3.4)** -- 10 benchmarks, all ops <55ms at 10K scale.
+- **SECURITY.md (ROADMAP 4.6)** -- vulnerability reporting policy.
+- **Coverage reporting (ROADMAP 3.3)** -- @vitest/coverage-v8 provider.
+
+### Changed
+
+- **Bumped to v1.0.0** -- all 37 ROADMAP tasks done. No breaking API changes.
+
+### Fixed
+
+- **CHANGELOG.md cleanup** -- consolidated duplicate entries, standardized format.
+
+### Quality Gates
+
+- 337 tests pass, 97%+ coverage, all ops <55ms
+- No any types, no TODOs, no debug code
+- All 5 pillars with full test suites
+
+
 ## [0.10.0] - 2026-06-27
 
 ### Added

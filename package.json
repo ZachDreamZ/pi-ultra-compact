@@ -1,6 +1,6 @@
 {
   "name": "pi-ultra-compact",
-  "version": "0.10.0",
+  "version": "1.0.0",
   "description": "Advanced compaction extension and skill for Pi with automatic threshold-based compaction and critical context preservation",
   "keywords": [
     "pi-package",
