@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Edge case tests (ROADMAP 3.1)** — 55 new tests covering empty messages arrays across all public methods, null/undefined content handling, missing fields (id/role/timestamp), invalid array entries, content type edge cases (numeric, boolean, object, image-only blocks), huge inputs (10K messages, 1MB+ content, 1000+ structured blocks), boundary values (NaN, Infinity, negative, MAX_SAFE_INTEGER), constructor extremes, reconfigure edge cases, and empty/whitespace-only string content. Suite grows from 219→274 tests.
+
+- **Fuzz tests (ROADMAP 3.2)** — 11 fuzz tests using random message patterns (roles, content, lengths, structured blocks) across estimateTokens, extractCriticalInfo, evictGradually, determineTier, microCompact, generateSummary, and compact. Covers mixed empty/whitespace, single-character messages, and extreme length variations. Total suite now 285 tests.
+
+- **SECURITY.md (ROADMAP 4.6)** — comprehensive security policy with supported versions, vulnerability reporting process, scope definitions, security-related configuration recommendations, and responsible disclosure guidelines.
+
+### Fixed
+
+- **ROADMAP.md Phase 2 progress** — corrected count from 15/16 to 16/16 (all Phase 2 pillars are complete). Updated overall progress to 81% (30/37 tasks done).
+
+
+### Added
+
 - **Hard watermark fallback tests (ROADMAP 2.9)** — 7 new tests verifying that `hardWatermark` fires as fallback when the percentage gate (Gate 1 at 60%) doesn't fire. Covers: default hardWatermark=0.5 fallback, custom low watermark (0.3), high watermark (0.9/1.0 where Gate 1 dominates), tokens below both gates, and explicit context window scenarios. Suite grows from 214→219 tests.
 
 - **Generational compaction MICRO vs FULL selection tests** — 15 new tests covering boundary conditions (exact 60%/90% thresholds), auto-detection via compact(), behavioral verification (MICRO → empty summary, FULL → structured sections), multiple-message accumulation, and context window adaptation (ROADMAP task 2.7).

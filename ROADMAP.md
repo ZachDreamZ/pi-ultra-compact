@@ -2,7 +2,7 @@
 
 > **Owner:** Senior Dev Agent (cron: `0 */4 * * *`)
 > **Repo:** ZachDreamZ/pi-ultra-compact
-> **Current version:** 0.9.3
+> **Current version:** 0.9.5
 > **Target:** v1.0.0
 
 ---
@@ -91,8 +91,8 @@
 
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
-| 3.1 | `[P2]` | Add edge case tests: empty messages, null content, huge inputs | 1.1 | `[ ]` |
-| 3.2 | `[P2]` | Add fuzz test for compaction with random message patterns | None | `[ ]` |
+| 3.1 | `[P2]` | Add edge case tests: empty messages, null content, huge inputs | 1.1 | `[x]` | 0.9.5 |
+| 3.2 | `[P2]` | Add fuzz test for compaction with random message patterns | None | `[x]` | 0.9.5 |
 | 3.3 | `[P2]` | Measure and report test coverage (c8/istanbul) | None | `[ ]` |
 | 3.4 | `[P3]` | Add performance benchmark tests (compaction speed for 1K, 10K msg) | None | `[ ]` |
 
@@ -109,7 +109,7 @@
 | 4.3 | `[P2]` | Add EXAMPLES.md with real-world usage patterns | None | `[x]` | 0.9.3 |
 | 4.4 | `[P2]` | Add PULL_REQUEST_TEMPLATE.md | None | `[x]` | 0.9.3 |
 | 4.5 | `[P2]` | Add ISSUE_TEMPLATE.md (bug report + feature request) | None | `[x]` | 0.9.3 |
-| 4.6 | `[P3]` | Add SECURITY.md with vulnerability reporting policy | None | `[ ]` |
+| 4.6 | `[P3]` | Add SECURITY.md with vulnerability reporting policy | None | `[x]` | 0.9.5 |
 
 ---
 
@@ -140,8 +140,8 @@
 | Phase | Total | Done | Pending | Progress |
 |-------|-------|------|---------|----------|
 | 1. Stability & Tests | 6 | 6 | 0 | 100% |
-| 2. Core Features | 16 | 15 | 1 | 94% |
-| 3. Test Coverage | 4 | 0 | 4 | 0% |
-| 4. Documentation | 6 | 5 | 1 | 83% |
+| 2. Core Features | 16 | 16 | 0 | 100% |
+| 3. Test Coverage | 4 | 2 | 2 | 50% |
+| 4. Documentation | 6 | 6 | 0 | 100% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **26** | **11** | **70%** |
+| **Total** | **37** | **30** | **7** | **81%** |
