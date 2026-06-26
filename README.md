@@ -114,6 +114,13 @@ The extension does not ship its own model context-window table. Pi remains respo
 
 See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
+### v0.9.2 - Test Suite Fixes & Automation
+- Fixed 27 test failures from jest/vitest API mismatch
+- Replaced jest.fn() with vi.fn() across all test files
+- Automated senior-dev-agent pipeline deployed (review, fix, publish, label)
+
+### v0.9.1 - CI/CD Pipeline Automation
+
 ### v0.8.0 - Generational Compaction + Safety Systems
 
 - **Graduated Eviction** — 4-level content stripping (reasoning → bulk → artifacts → full)
@@ -183,11 +190,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - [Pi](https://pi.dev/) - The AI coding agent
-
-### v0.9.2 - Test Suite Fixes & Automation
-- Fixed 27 test failures from jest/vitest API mismatch
-- Replaced jest.fn() with vi.fn() across all test files
-- Automated senior-dev-agent pipeline deployed (review, fix, publish, label)
-
-### v0.9.1 - CI/CD Pipeline Automation
 
