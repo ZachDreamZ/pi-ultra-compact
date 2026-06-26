@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { UltraCompactEngine } from "../extensions/engine";
 import type { Message } from "../extensions/types";
 import { makeMsg, makeStructuredMsg } from "./helpers";

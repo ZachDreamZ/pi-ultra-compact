@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 /**
  * Tests for the Pi extension entry point (extensions/index.ts).
  *
@@ -15,8 +16,8 @@ function makePiMock(overrides: Record<string, any> = {}) {
 	const handlers: Record<string, Function[]> = {};
 	return {
 		model: overrides.model ?? "gpt-4o",
-		registerCommand: jest.fn(),
-		on: jest.fn((event: string, handler: Function) => {
+		registerCommand: vi.fn(),
+		on: vi.fn((event: string, handler: Function) => {
 			if (!handlers[event]) handlers[event] = [];
 			handlers[event].push(handler);
 		}),
@@ -82,7 +83,7 @@ describe("piUltraCompact factory", () => {
 	});
 
 	it("logs warning and returns when pi.registerCommand is unavailable", () => {
-		const consoleError = jest.spyOn(console, "error").mockImplementation();
+		const consoleError = vi.spyOn(console, "error").mockImplementation();
 		const pi = { model: "gpt-4o" }; // no registerCommand
 		piUltraCompact(pi);
 		expect(consoleError).toHaveBeenCalledWith(
@@ -99,7 +100,7 @@ describe("piUltraCompact factory", () => {
 	it("handles pi without on method (autoCompact disabled)", () => {
 		const pi = {
 			model: "gpt-4o",
-			registerCommand: jest.fn(),
+			registerCommand: vi.fn(),
 		};
 		// autoCompact=false skips pi.on calls for session_before_compact
 		expect(() => piUltraCompact(pi, { autoCompact: false })).not.toThrow();
@@ -115,8 +116,8 @@ describe("/ultracompact command handler", () => {
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
 		const ctx = {
-			compact: jest.fn(),
-			ui: { notify: jest.fn() },
+			compact: vi.fn(),
+			ui: { notify: vi.fn() },
 		};
 		handler({}, ctx);
 		expect(ctx.compact).toHaveBeenCalledWith(
@@ -132,8 +133,8 @@ describe("/ultracompact command handler", () => {
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
 		const ctx = {
-			compact: jest.fn(),
-			ui: { notify: jest.fn() },
+			compact: vi.fn(),
+			ui: { notify: vi.fn() },
 		};
 		handler({}, ctx);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(
@@ -147,7 +148,7 @@ describe("/ultracompact command handler", () => {
 		piUltraCompact(pi);
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
-		const consoleWarn = jest.spyOn(console, "warn").mockImplementation();
+		const consoleWarn = vi.spyOn(console, "warn").mockImplementation();
 		handler({}, {}); // no ctx.compact
 		expect(consoleWarn).toHaveBeenCalledWith(
 			expect.stringContaining("ctx.compact unavailable"),
@@ -160,7 +161,7 @@ describe("/ultracompact command handler", () => {
 		piUltraCompact(pi);
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
-		const consoleWarn = jest.spyOn(console, "warn").mockImplementation();
+		const consoleWarn = vi.spyOn(console, "warn").mockImplementation();
 		handler({}, null);
 		expect(consoleWarn).toHaveBeenCalledWith(
 			expect.stringContaining("ctx.compact unavailable"),
@@ -174,8 +175,8 @@ describe("/ultracompact command handler", () => {
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
 		const ctx = {
-			compact: jest.fn((opts: any) => opts.onComplete()),
-			ui: { notify: jest.fn() },
+			compact: vi.fn((opts: any) => opts.onComplete()),
+			ui: { notify: vi.fn() },
 		};
 		handler({}, ctx);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(
@@ -190,8 +191,8 @@ describe("/ultracompact command handler", () => {
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
 		const ctx = {
-			compact: jest.fn((opts: any) => opts.onError(new Error("test error"))),
-			ui: { notify: jest.fn() },
+			compact: vi.fn((opts: any) => opts.onError(new Error("test error"))),
+			ui: { notify: vi.fn() },
 		};
 		handler({}, ctx);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(
@@ -205,9 +206,9 @@ describe("/ultracompact command handler", () => {
 		piUltraCompact(pi);
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
-		const consoleError = jest.spyOn(console, "error").mockImplementation();
+		const consoleError = vi.spyOn(console, "error").mockImplementation();
 		const ctx = {
-			compact: jest.fn((opts: any) => opts.onError(new Error("test error"))),
+			compact: vi.fn((opts: any) => opts.onError(new Error("test error"))),
 			// no ui
 		};
 		handler({}, ctx);
@@ -224,7 +225,7 @@ describe("/ultracompact command handler", () => {
 
 		const handler = pi.registerCommand.mock.calls[0][1].handler;
 		const ctx = {
-			compact: jest.fn(),
+			compact: vi.fn(),
 		};
 		expect(() => handler({}, ctx)).not.toThrow();
 	});
@@ -242,7 +243,7 @@ describe("model_select event", () => {
 		)?.[1];
 		expect(modelSelectHandler).toBeDefined();
 
-		const consoleLog = jest.spyOn(console, "log").mockImplementation();
+		const consoleLog = vi.spyOn(console, "log").mockImplementation();
 		modelSelectHandler!(
 			{ model: { id: "claude-4.5-opus", contextWindow: 200000 } },
 			{},
@@ -261,7 +262,7 @@ describe("model_select event", () => {
 			(c: any[]) => c[0] === "model_select",
 		)?.[1];
 
-		const consoleLog = jest.spyOn(console, "log").mockImplementation();
+		const consoleLog = vi.spyOn(console, "log").mockImplementation();
 		modelSelectHandler!(
 			{ model: { name: "gemini-2.5-pro", contextWindow: 1000000 } },
 			{},
@@ -351,7 +352,7 @@ describe("session_before_compact hook", () => {
 					firstKeptEntryId: "1",
 				},
 			},
-			{ ui: { notify: jest.fn() } },
+			{ ui: { notify: vi.fn() } },
 		);
 		expect(result).toBeDefined();
 		expect(result?.compaction).toBeDefined();
@@ -374,7 +375,7 @@ describe("session_before_compact hook", () => {
 					firstKeptEntryId: "1",
 				},
 			},
-			{ ui: { notify: jest.fn() } },
+			{ ui: { notify: vi.fn() } },
 		);
 		expect(result).toBeDefined();
 		expect(result?.compaction?.details?.ultracompact).toBe(true);
@@ -405,7 +406,7 @@ describe("session_before_compact hook", () => {
 		const pi = makePiMock();
 		piUltraCompact(pi, { thresholdTokens: 100 });
 		const handler = getBeforeCompactHandler(pi);
-		const notify = jest.fn();
+		const notify = vi.fn();
 		await handler(
 			{
 				customInstructions: "ultracompact",
@@ -461,7 +462,7 @@ describe("session_before_compact hook", () => {
 					firstKeptEntryId: "1",
 				},
 			},
-			{ ui: { notify: jest.fn() } },
+			{ ui: { notify: vi.fn() } },
 		);
 		expect(result?.compaction?.summary).toContain("Previous summary content");
 	});
@@ -479,7 +480,7 @@ describe("circuit breaker", () => {
 	it("trips after consecutive failures and returns lossy truncation", async () => {
 		// Patch generateSummary to throw so the circuit breaker path is exercised
 		const origGenerateSummary = UltraCompactEngine.prototype.generateSummary;
-		UltraCompactEngine.prototype.generateSummary = jest.fn().mockRejectedValue(
+		UltraCompactEngine.prototype.generateSummary = vi.fn().mockRejectedValue(
 			new Error("forced compaction error"),
 		);
 
@@ -504,7 +505,7 @@ describe("circuit breaker", () => {
 				},
 			};
 
-			const notify = jest.fn();
+			const notify = vi.fn();
 			const ctx = { ui: { notify } };
 
 			// First failure — falls back to Pi default
@@ -527,7 +528,7 @@ describe("circuit breaker", () => {
 
 	it("enters cooldown after tripping and falls back to default", async () => {
 		const origGenerateSummary = UltraCompactEngine.prototype.generateSummary;
-		UltraCompactEngine.prototype.generateSummary = jest.fn().mockRejectedValue(
+		UltraCompactEngine.prototype.generateSummary = vi.fn().mockRejectedValue(
 			new Error("forced compaction error"),
 		);
 
@@ -552,7 +553,7 @@ describe("circuit breaker", () => {
 			};
 
 			// Trip the breaker (maxFailures=1, so first failure trips it)
-			await handler(failEvent, { ui: { notify: jest.fn() } });
+			await handler(failEvent, { ui: { notify: vi.fn() } });
 
 			// Restore original so next call won't throw
 			UltraCompactEngine.prototype.generateSummary = origGenerateSummary;
@@ -602,7 +603,7 @@ describe("micro-compaction path in session_before_compact", () => {
 					firstKeptEntryId: "1",
 				},
 			},
-			{ ui: { notify: jest.fn() } },
+			{ ui: { notify: vi.fn() } },
 		);
 		if (result) {
 			expect(result.compaction.summary).toContain("Chat");
@@ -635,7 +636,7 @@ describe("empty summary validation in before_compact", () => {
 					firstKeptEntryId: "1",
 				},
 			},
-			{ ui: { notify: jest.fn() } },
+			{ ui: { notify: vi.fn() } },
 		);
 		expect(result?.compaction?.summary?.length).toBeGreaterThan(0);
 	});

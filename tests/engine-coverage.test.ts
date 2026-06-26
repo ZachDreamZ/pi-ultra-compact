@@ -437,7 +437,7 @@ describe("removeOldCompressibleMessages (via evictGradually L4)", () => {
 
 describe("LLM summarization", () => {
 	it("uses llmSummarize callback when useLLM is true", async () => {
-		const mockSummarize = jest.fn().mockResolvedValue("LLM summary result");
+		const mockSummarize = vi.fn().mockResolvedValue("LLM summary result");
 		const engine = new UltraCompactEngine({
 			useLLM: true,
 			llmSummarize: mockSummarize,
@@ -459,7 +459,7 @@ describe("LLM summarization", () => {
 	});
 
 	it("includes previous summary header when LLM is used with previous context", async () => {
-		const mockSummarize = jest.fn().mockResolvedValue("LLM condensed output");
+		const mockSummarize = vi.fn().mockResolvedValue("LLM condensed output");
 		const engine = new UltraCompactEngine({
 			useLLM: true,
 			llmSummarize: mockSummarize,
@@ -476,7 +476,7 @@ describe("LLM summarization", () => {
 	});
 
 	it("falls back to heuristic when LLM callback throws", async () => {
-		const mockSummarize = jest.fn().mockRejectedValue(new Error("LLM error"));
+		const mockSummarize = vi.fn().mockRejectedValue(new Error("LLM error"));
 		const engine = new UltraCompactEngine({
 			useLLM: true,
 			llmSummarize: mockSummarize,
