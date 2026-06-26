@@ -6,10 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-
 ### Added
 
-- **JSDoc comments for all public methods in engine.ts** — added full JSDoc to the constructor (16 config params documented), `generateSummary`, and enhanced 7 existing JSDoc blocks with `@param` and `@returns` tags (ROADMAP task 4.1).
+- **EXAMPLES.md** — new file with real-world usage patterns for all features (ROADMAP task 4.3)
+
+### Updated
+
+- **ROADMAP.md** — synced all Phase 2 tasks to [x] (features shipped in v0.8.0, tests verified), marked Phase 4 docs tasks (CONTRIBUTING.md, SECURITY.md, templates) as complete, updated Progress Summary to 76% overall
+
+### Tracked
+
+- **CONTRIBUTING.md** — added to version control (was untracked)
+- **SECURITY.md** — added to version control (was untracked)
+- **.github/ISSUE_TEMPLATE.md** — added to version control (was untracked)
+- **.github/PULL_REQUEST_TEMPLATE.md** — added to version control (was untracked)
 
 ## [0.9.3] - 2026-06-26
 
