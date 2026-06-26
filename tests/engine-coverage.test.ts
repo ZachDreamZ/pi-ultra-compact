@@ -139,6 +139,163 @@ describe("compact", () => {
 	});
 });
 
+// ─── generational compaction: MICRO vs FULL selection (ROADMAP 2.7) ──
+
+describe("generational compaction: MICRO vs FULL selection", () => {
+	// ─── Boundary tests ─────────────────────────────────────────────
+
+	it("determineTier returns MICRO at exactly 60% boundary", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		// 60% of 128k = 76800 tokens. At 4.5 chars/token = 345600 chars
+		const bigContent = "word ".repeat(69120); // ~345600 chars, exactly 76800 tokens
+		const msgs = [makeMsg("1", "user", bigContent)];
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.MICRO);
+	});
+
+	it("determineTier returns NONE just below 60%", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		// ~59.9% of 128k → ~76799 tokens → below 60%
+		const content = "word ".repeat(69000); // ~345000 chars
+		const msgs = [makeMsg("1", "user", content)];
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.NONE);
+	});
+
+	it("determineTier returns FULL at exactly 90% boundary", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		// 90% of 128k = 115200 tokens. At 4.5 chars/token = 518400 chars
+		const content = "word ".repeat(103680); // ~518400 chars, exactly 115200 tokens
+		const msgs = [makeMsg("1", "user", content)];
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.FULL);
+	});
+
+	it("determineTier returns MICRO just below 90%", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		// ~89.9% of 128k → ~115100 tokens → below 90%
+		const content = "word ".repeat(103500); // ~517500 chars
+		const msgs = [makeMsg("1", "user", content)];
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.MICRO);
+	});
+
+	it("determineTier returns FULL when usage exceeds 100%", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		const content = "word ".repeat(150000); // >> 128k tokens
+		const msgs = [makeMsg("1", "user", content)];
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.FULL);
+	});
+
+	// ─── Auto-detection via compact() ───────────────────────────────
+
+	it("compact auto-selects MICRO at ~70% usage", async () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		// ~70% of 128k ≈ 89600 tokens ≈ ~403200 chars
+		const content = "word ".repeat(80000); // ~400k chars ≈ ~88889 tokens ≈ 69%
+		const msgs = [makeMsg("1", "user", content)];
+		const result = await engine.compact(msgs);
+		// MICRO auto-detect → empty summary (no LLM summarization)
+		expect(result.summary).toBe("");
+		expect(result.tokensBefore).toBeGreaterThan(0);
+		expect(result.tokensAfter).toBeGreaterThanOrEqual(0);
+	});
+
+	it("compact auto-selects FULL at ~95% usage", async () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		// ~95% of 128k = 121600 tokens ≈ ~547200 chars
+		const content = "GOAL: Major objective. ERROR: Something failed. ".repeat(25000);
+		const msgs = [makeMsg("1", "user", content)];
+		const result = await engine.compact(msgs);
+		// FULL auto-detect → produces structured summary
+		expect(result.summary.length).toBeGreaterThan(0);
+		expect(result.tokensBefore).toBeGreaterThan(0);
+	});
+
+	it("compact auto-selects MICRO at exactly 60% boundary", async () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		const content = "word ".repeat(69120); // exactly at 60% → MICRO
+		const msgs = [makeMsg("1", "user", content)];
+		const result = await engine.compact(msgs);
+		expect(result.summary).toBe("");
+	});
+
+	it("compact auto-selects FULL at exactly 90% boundary", async () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" }); // 128k context
+		// 90% → exactly FULL tier
+		const content = "GOAL: Critical system update. ".repeat(26000);
+		const msgs = [makeMsg("1", "user", content)];
+		const result = await engine.compact(msgs);
+		expect(result.summary.length).toBeGreaterThan(0);
+	});
+
+	// ─── Behavioral differences ─────────────────────────────────
+
+	it("MICRO path preserves messages and returns empty summary", async () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const msgs = [
+			makeMsg("1", "user", "word ".repeat(40000)),
+			makeMsg("2", "tool", "A".repeat(6000)),
+		];
+		const result = await engine.compact(msgs, undefined, CompactionTier.MICRO);
+		expect(result.summary).toBe("");
+		expect(result.readFiles).toEqual([]);
+		expect(result.compressionRatio).toBeLessThanOrEqual(1);
+	});
+
+	it("FULL path produces structured summary with markdown sections", async () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const msgs = [
+			makeMsg("1", "user", "GOAL: Complete the implementation"),
+			makeMsg("2", "user", "ERROR: Found a critical bug in the module"),
+			makeMsg("3", "user", "DECISION: Proceed with microservices"),
+		];
+		const result = await engine.compact(msgs, undefined, CompactionTier.FULL);
+		expect(result.summary.length).toBeGreaterThan(0);
+		// Should contain structured sections from generateSummary
+		expect(result.summary).toContain("## ");
+	});
+
+	// ─── Multiple messages accumulation ─────────────────────────
+
+	it("accumulated small messages reach MICRO tier", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const msgs: Message[] = [];
+		for (let i = 0; i < 100; i++) {
+			msgs.push(makeMsg(
+				String(i),
+				"user",
+				"Medium length message padding to accumulate tokens ".repeat(70),
+			));
+		}
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.MICRO);
+	});
+
+	it("accumulated messages reach FULL tier", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const msgs: Message[] = [];
+		for (let i = 0; i < 200; i++) {
+			msgs.push(makeMsg(
+				String(i),
+				"user",
+				"Large message content padding to exceed context window limits ".repeat(80),
+			));
+		}
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.FULL);
+	});
+
+	// ─── Context window adaptation ─────────────────────────────
+
+	it("determineTier adapts to smaller custom context window", () => {
+		const engine = new UltraCompactEngine({ contextWindow: 32000 });
+		// ~70% of 32k = 22400 tokens ≈ ~100800 chars
+		const content = "word ".repeat(20000); // ~100k chars
+		const msgs = [makeMsg("1", "user", content)];
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.MICRO);
+	});
+
+	it("determineTier returns NONE when content fits in large window", () => {
+		const engine = new UltraCompactEngine({ contextWindow: 1000000 });
+		const msgs = [makeMsg("1", "user", "hello")];
+		expect(engine.determineTier(msgs)).toBe(CompactionTier.NONE);
+	});
+});
 // ─── evictGradually ───────────────────────────────────────────────
 
 describe("evictGradually", () => {

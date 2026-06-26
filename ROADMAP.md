@@ -2,7 +2,7 @@
 
 > **Owner:** Senior Dev Agent (cron: `0 */4 * * *`)
 > **Repo:** ZachDreamZ/pi-ultra-compact
-> **Current version:** 0.9.2
+> **Current version:** 0.9.3
 > **Target:** v1.0.0
 
 ---
@@ -57,7 +57,7 @@
 |---|----------|------|------|--------|
 | 2.5 | `[P1]` | Micro-compaction tier — verify it runs correctly (strip reasoning + bulk) | 2.2 | `[x]` |
 | 2.6 | `[P1]` | Full compaction tier — verify structured summarization path | 2.5 | `[x]` |
-| 2.7 | `[P2]` | Add generational compaction tests: MICRO vs FULL selection | 2.6 | `[ ]` |
+| 2.7 | `[P2]` | Add generational compaction tests: MICRO vs FULL selection | 2.6 | `[x]` | 0.9.4 |
 
 ### Pillar 3: Preemptive Trigger ✅ COMPLETE
 
@@ -105,10 +105,10 @@
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
 | 4.1 | `[P1]` | Add JSDoc comments to all public methods in engine.ts | None | `[x]` |
-| 4.2 | `[P1]` | Create CONTRIBUTING.md with setup instructions | None | `[ ]` |
-| 4.3 | `[P2]` | Add EXAMPLES.md with real-world usage patterns | None | `[ ]` |
-| 4.4 | `[P2]` | Add PULL_REQUEST_TEMPLATE.md | None | `[ ]` |
-| 4.5 | `[P2]` | Add ISSUE_TEMPLATE.md (bug report + feature request) | None | `[ ]` |
+| 4.2 | `[P1]` | Create CONTRIBUTING.md with setup instructions | None | `[x]` | 0.9.3 |
+| 4.3 | `[P2]` | Add EXAMPLES.md with real-world usage patterns | None | `[x]` | 0.9.3 |
+| 4.4 | `[P2]` | Add PULL_REQUEST_TEMPLATE.md | None | `[x]` | 0.9.3 |
+| 4.5 | `[P2]` | Add ISSUE_TEMPLATE.md (bug report + feature request) | None | `[x]` | 0.9.3 |
 | 4.6 | `[P3]` | Add SECURITY.md with vulnerability reporting policy | None | `[ ]` |
 
 ---
@@ -140,8 +140,8 @@
 | Phase | Total | Done | Pending | Progress |
 |-------|-------|------|---------|----------|
 | 1. Stability & Tests | 6 | 6 | 0 | 100% |
-| 2. Core Features | 16 | 13 | 3 | 81% |
+| 2. Core Features | 16 | 14 | 2 | 88% |
 | 3. Test Coverage | 4 | 0 | 4 | 0% |
-| 4. Documentation | 6 | 1 | 5 | 17% |
+| 4. Documentation | 6 | 5 | 1 | 83% |
 | 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **20** | **17** | **54%** |
+| **Total** | **37** | **25** | **12** | **68%** |
