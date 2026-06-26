@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Performance benchmark tests (ROADMAP 3.4)** — 10 benchmark tests measuring execution time for estimateTokens, extractCriticalInfo, determineTier, microCompact, and evictGradually at 1K and 10K message scales. Results printed as console table and structured JSON marker for CI collection. All operations complete in <50ms at 10K scale.
 
+- **Phase 2 completion verified (ROADMAP 5.1)** — all 16 Phase 2 tasks across all 5 pillars (Graduated Eviction, Generational Compaction, Preemptive Trigger, Cache-Aware Compaction, Circuit Breaker & Snapshot-Rollback) are confirmed complete with tests.
+
+- **Phase 4 documentation verified (ROADMAP 5.3)** — all 6 Phase 4 documentation tasks (JSDoc, CONTRIBUTING.md, EXAMPLES.md, PULL_REQUEST_TEMPLATE.md, ISSUE_TEMPLATE.md, SECURITY.md) are confirmed present and complete.
+
+- **ROADMAP progress update** — overall progress from 32/37 (86%) to 34/37 (92%). Phase 5: 2/5 tasks complete.
+
 ### Fixed
 
 - **ROADMAP.md Phase 2 progress** — corrected count from 15/16 to 16/16 (all Phase 2 pillars are complete). Updated overall progress to 81% (30/37 tasks done).

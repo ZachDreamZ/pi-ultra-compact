@@ -119,9 +119,9 @@
 
 | # | Priority | Task | Deps | Status |
 |---|----------|------|------|--------|
-| 5.1 | `[P1]` | All Phase 2 pillars complete with tests | Phase 2 | `[ ]` |
+| 5.1 | `[P1]` | All Phase 2 pillars complete with tests | Phase 2 | `[x]` |
 | 5.2 | `[P1]` | All Phase 3 test coverage at 85%+ | Phase 3 | `[ ]` |
-| 5.3 | `[P1]` | All Phase 4 documentation complete | Phase 4 | `[ ]` |
+| 5.3 | `[P1]` | All Phase 4 documentation complete | Phase 4 | `[x]` |
 | 5.4 | `[P2]` | Bump to v1.0.0 with full changelog | 5.1-5.3 | `[ ]` |
 | 5.5 | `[P2]` | Write migration guide from v0.x to v1.0 | 5.4 | `[ ]` |
 
@@ -143,5 +143,5 @@
 | 2. Core Features | 16 | 16 | 0 | 100% |
 | 3. Test Coverage | 4 | 4 | 0 | 100% |
 | 4. Documentation | 6 | 6 | 0 | 100% |
-| 5. v1.0 Release | 5 | 0 | 5 | 0% |
-| **Total** | **37** | **32** | **5** | **86%** |
+| 5. v1.0 Release | 5 | 2 | 3 | 40% |
+| **Total** | **37** | **34** | **3** | **92%** |
