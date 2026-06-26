@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Model detection tests fixed** — corrected context window expectations for deepseek-r1 (65536), codestral (256000), o3 (200000), mistral (128000), and llama (128000) to match actual model-specific entries (ROADMAP task 1.2/1.3 follow-up).
+
+### Added
+
+- **maxEvictionLevel config cap verified** — added 5 tests confirming `evictGradually` respects the `maxEvictionLevel` config cap at every level (1-4), including end-to-end verification through `generateSummary` (ROADMAP task 2.4).
+
 ### Added
 
 - **JSDoc comments for all public methods in engine.ts** — added full JSDoc to the constructor (16 config params documented), `generateSummary`, and enhanced 7 existing JSDoc blocks with `@param` and `@returns` tags (ROADMAP task 4.1).

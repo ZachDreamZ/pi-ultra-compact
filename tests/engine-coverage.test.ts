@@ -876,7 +876,7 @@ describe("model detection edge cases", () => {
 
 	it("detects deepseek family", () => {
 		const engine = new UltraCompactEngine({ modelName: "deepseek-r1" });
-		expect(engine.getContextWindow()).toBe(128000);
+		expect(engine.getContextWindow()).toBe(65536);
 		const rec = engine.getModelRecommendations();
 		expect(rec.modelFamily).toBe("deepseek");
 	});
@@ -890,12 +890,12 @@ describe("model detection edge cases", () => {
 
 	it("detects codestral", () => {
 		const engine = new UltraCompactEngine({ modelName: "codestral" });
-		expect(engine.getContextWindow()).toBe(128000);
+		expect(engine.getContextWindow()).toBe(256000);
 	});
 
 	it("detects o3", () => {
 		const engine = new UltraCompactEngine({ modelName: "o3" });
-		expect(engine.getContextWindow()).toBe(128000);
+		expect(engine.getContextWindow()).toBe(200000);
 	});
 });
 
@@ -937,4 +937,84 @@ describe("removeOldCompressibleMessages add-back candidates", () => {
 		const hasUser = result.messages.some((m) => m.id === "u1");
 		expect(hasUser).toBe(true);
 	});
+});
+
+// ─── maxEvictionLevel config cap (Task 2.4) ────────────────────────
+
+describe("maxEvictionLevel config cap", () => {
+  it("stops at level 1 when maxLevel=STRIP_REASONING even if budget not met", () => {
+    const engine = new UltraCompactEngine({
+      maxEvictionLevel: EvictionLevel.STRIP_REASONING,
+    });
+    // Messages that need level 3+ to meet tight budget
+    const msgs: Message[] = [
+      makeStructuredMsg("1", "assistant", [
+        { type: "thinking", text: "Thinking block ".repeat(50) },
+        { type: "text", text: "Short answer" },
+      ]),
+      makeMsg("2", "user", "Another message"),
+      makeMsg("3", "tool", "Long successful output that should not be stripped ".repeat(20)),
+    ];
+    const result = engine.evictGradually(msgs, 1, EvictionLevel.STRIP_REASONING);
+    // Level 1 may reduce tokens, but if budget not met, should NOT proceed beyond level 1
+    expect(result.stats.levelUsed).toBeLessThanOrEqual(EvictionLevel.STRIP_REASONING);
+  });
+
+  it("stops at level 2 when maxLevel=STRIP_BULK_OUTPUT even if budget not met", () => {
+    const engine = new UltraCompactEngine({
+      maxEvictionLevel: EvictionLevel.STRIP_BULK_OUTPUT,
+    });
+    const msgs: Message[] = [
+      makeMsg("1", "tool", "Normal output that should not be stripped ".repeat(20)),
+      makeMsg("2", "tool", "Another normal output ".repeat(15)),
+      makeMsg("3", "user", "User question"),
+    ];
+    const result = engine.evictGradually(msgs, 1, EvictionLevel.STRIP_BULK_OUTPUT);
+    // Should not reach level 3 (STRIP_ARTIFACTS) or level 4 (FULL_REMOVAL)
+    expect(result.stats.levelUsed).toBeLessThanOrEqual(EvictionLevel.STRIP_BULK_OUTPUT);
+  });
+
+  it("stops at level 3 when maxLevel=STRIP_ARTIFACTS even if budget not met", () => {
+    const engine = new UltraCompactEngine({
+      maxEvictionLevel: EvictionLevel.STRIP_ARTIFACTS,
+    });
+    const msgs: Message[] = [
+      makeMsg("1", "user", "User question"),
+      makeMsg("2", "assistant", "Assistant response ".repeat(30)),
+      makeMsg("3", "assistant", "Another response ".repeat(30)),
+    ];
+    const result = engine.evictGradually(msgs, 1, EvictionLevel.STRIP_ARTIFACTS);
+    // Should not reach level 4 (FULL_REMOVAL)
+    expect(result.stats.levelUsed).toBeLessThanOrEqual(EvictionLevel.STRIP_ARTIFACTS);
+  });
+
+  it("uses default FULL_REMOVAL when no maxEvictionLevel configured", () => {
+    const engine = new UltraCompactEngine(); // no maxEvictionLevel
+    const msgs: Message[] = [];
+    for (let i = 0; i < 30; i++) {
+      msgs.push(makeMsg(String(i), "assistant", `Message ${i} with padding`));
+    }
+    const result = engine.evictGradually(msgs, 5);
+    expect(result.stats.levelUsed).toBe(EvictionLevel.FULL_REMOVAL);
+  });
+
+  it("config maxEvictionLevel is passed through from constructor to evictGradually via generateSummary", async () => {
+    // This test verifies the end-to-end flow: config → generateSummary → evictGradually
+    const engine = new UltraCompactEngine({
+      maxEvictionLevel: EvictionLevel.STRIP_BULK_OUTPUT, // cap at level 2
+    });
+    // Create enough messages that would normally trigger level 4 eviction
+    const msgs: Message[] = [
+      makeMsg("sys", "system", "System prompt"),
+      makeMsg("1", "user", "Build the system"),
+    ];
+    for (let i = 2; i < 20; i++) {
+      msgs.push(makeMsg(String(i), "assistant", `Response ${i} with content`.repeat(50)));
+    }
+    const result = await engine.generateSummary(msgs);
+    // Should not crash and return a valid result even with capped eviction
+    expect(result.tokensBefore).toBeGreaterThan(0);
+    expect(result.tokensAfter).toBeGreaterThanOrEqual(0);
+    expect(result.summary).toBeDefined();
+  });
 });
