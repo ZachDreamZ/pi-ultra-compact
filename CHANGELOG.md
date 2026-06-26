@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-06-27
+
+### Added
+
+- **Utils test coverage (ROADMAP 5.2)** — new `tests/utils.test.ts` with 63 tests covering `messageContent` edge cases (structured content blocks, non-text filtering, missing text fields, content coercion for null/undefined/boolean/numeric/object), `extractByPattern` (all 9 keyword categories, deduplication, empty inputs, case-insensitive matching, structured content), `containsErrorIndicators` (all 8 error patterns, clean content, empty/whitespace), `emptyCompactionResult` (defaults, custom summary, timestamp validation), and `KEYWORD_PATTERNS` structure verification.
+
+- **Coverage thresholds raised to 85% (ROADMAP 5.2)** — vitest.config.ts coverage thresholds updated from 80/70/80/80 to 85% across all metrics to match Phase 3 test coverage goal. Current actual coverage: 97.66% statements, 89.14% branches, 100% functions, 98.23% lines.
+
+- **Version bumped to 0.10.0** — reflects completed Phase 5 milestone 5.2 (test coverage at 85%+).
+
 ## [Unreleased]
 
 ### Added
