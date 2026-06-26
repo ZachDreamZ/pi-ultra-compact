@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Generational compaction MICRO vs FULL selection tests** — 15 new tests covering boundary conditions (exact 60%/90% thresholds), auto-detection via compact(), behavioral verification (MICRO → empty summary, FULL → structured sections), multiple-message accumulation, and context window adaptation (ROADMAP task 2.7).
+
+### Fixed
+
+- **ROADMAP.md accuracy** — marked Phase 4 documentation tasks (CONTRIBUTING.md, EXAMPLES.md, PULL_REQUEST_TEMPLATE.md, ISSUE_TEMPLATE.md) as complete; files were created in prior commits but ROADMAP was not updated. Updated version from 0.9.2 to 0.9.3 to match package.json. Phase 2 progress 81%→88%, Phase 4 progress 17%→83%, overall 54%→68%.
+
 ### Fixed
 
 - **Model detection tests fixed** — corrected context window expectations for deepseek-r1 (65536), codestral (256000), o3 (200000), mistral (128000), and llama (128000) to match actual model-specific entries (ROADMAP task 1.2/1.3 follow-up).
