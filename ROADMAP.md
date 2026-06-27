@@ -3,7 +3,7 @@
 > **Owner:** Senior Dev Agent (cron: `0 */4 * * *`)
 > **Repo:** ZachDreamZ/pi-ultra-compact
 > **Current version:** 1.1.0
-> **Target:** v1.1.0 ✅ (Phase 7 active)
+> **Target:** v1.1.0 ✅ (Phase 8 active)
 
 ---
 
@@ -181,4 +181,14 @@
 | 5. v1.0 Release | 5 | 5 | 0 | 100% |
 | 6. Maintenance and Tooling | 6 | 6 | 0 | 100% |
 | 7. CI/CD Reliability | 2 | 2 | 0 | 100% |
-| **Total** | **45** | **45** | **0** | **100%** |
+| 8. Dependency Freshness | 1 | 1 | 0 | 100% |
+| **Total** | **46** | **46** | **0** | **100%** |
+
+
+## Phase 8: Dependency Freshness (v1.2.0)
+
+> Goal: Keep dev dependencies current, eliminate deprecation warnings
+
+| # | Priority | Task | Deps | Status | Version |
+|---|----------|------|------|--------|---------|
+| 8.1 | [P2] | Upgrade TypeScript from 5.9.3 to 6.0.3 | None | [x] | 1.2.0 |
