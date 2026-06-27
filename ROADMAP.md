@@ -167,7 +167,7 @@
 | # | Priority | Task | Deps | Status | Version |
 |---|----------|------|------|--------|---------|
 | 7.1 | [P0] | Fix release workflow: replace release-please with tag-based trigger to avoid PR creation permission issue | None | [x] | 1.1.1 |
-| 7.2 | [P2] | Publish v1.1.1 to npm via tag-triggered workflow | 7.1 | [ ] | 1.1.1 |
+| 7.2 | [P2] | Publish v1.1.2 to npm via tag-triggered release workflow | 7.1 | [x] | 1.1.2 |
 
 
 ## Progress Summary
@@ -180,5 +180,5 @@
 | 4. Documentation | 6 | 6 | 0 | 100% |
 | 5. v1.0 Release | 5 | 5 | 0 | 100% |
 | 6. Maintenance and Tooling | 6 | 6 | 0 | 100% |
-| 7. CI/CD Reliability | 2 | 1 | 1 | 50% |
-| **Total** | **45** | **44** | **1** | **98%** |
+| 7. CI/CD Reliability | 2 | 2 | 0 | 100% |
+| **Total** | **45** | **45** | **0** | **100%** |

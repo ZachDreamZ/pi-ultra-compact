@@ -45,6 +45,17 @@ l).
 - 337 tests pass, 97%+ coverage
 - All CI checks green on tag push
 
+## [1.1.2] - 2026-06-27
+
+### Fixed
+
+- **Release workflow now fully functional** — npm publish CI pipeline fixed by updating the `NPM_TOKEN` secret and adding `always-auth: true` to `setup-node`. Tag-based releases now create GitHub releases and publish to npm automatically (closes #39).
+
+### Quality Gates
+
+- 337 tests pass, 97%+ coverage
+- Release CI confirmed green on v1.1.2 tag
+
 ## [1.0.0] - 2026-06-27
 
 ### Added
