@@ -2,8 +2,8 @@
 
 > **Owner:** Senior Dev Agent (cron: `0 */4 * * *`)
 > **Repo:** ZachDreamZ/pi-ultra-compact
-> **Current version:** 1.1.0
-> **Target:** v1.1.0 ✅ (Phase 8 active)
+> **Current version:** 1.2.0
+> **Target:** v1.2.0 ✅ (Phase 8 complete)
 
 ---
 
