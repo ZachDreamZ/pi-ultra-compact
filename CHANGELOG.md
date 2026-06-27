@@ -33,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 l).
 
+## [1.1.1] - 2026-06-27
+
+### Fixed
+
+- **Release workflow now tag-based** — replaced `googleapis/release-please-action@v4` with a simpler tag-triggered workflow that creates GitHub releases and publishes to npm directly. Avoids the GITHUB_TOKEN PR creation permission issue (fixes #39).
+- **Workflow permissions** — Release workflow no longer requires `pull-requests: write`, uses only `contents: write` for tag-based release creation.
+
+### Quality Gates
+
+- 337 tests pass, 97%+ coverage
+- All CI checks green on tag push
+
 ## [1.0.0] - 2026-06-27
 
 ### Added
