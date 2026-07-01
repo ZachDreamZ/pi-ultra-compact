@@ -95,6 +95,98 @@ describe("microCompact", () => {
 		const result = engine.microCompact(msgs);
 		expect(result.messages).toBeDefined();
 	});
+
+	it("removes structured thinking blocks from assistant output", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const hugeText = "TextContentForTokenBudget".repeat(25000);
+		const msgs: Message[] = [
+			makeStructuredMsg("1", "assistant", [
+				{ type: "thinking", text: "SecretThinking" },
+				{ type: "text", text: hugeText },
+			]),
+		];
+		const result = engine.microCompact(msgs);
+		const a = result.messages.find(function(m) { return m.role === "assistant"; });
+		expect(a).toBeDefined();
+		const c = typeof a.content === "string" ? a.content : JSON.stringify(a.content);
+		expect(c).not.toContain("SecretThinking");
+		expect(result.tokensSaved).toBeGreaterThanOrEqual(0);
+	});
+
+	it("truncates bulk tool outputs when over budget", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const bulkOutput = Array(150).fill("LongLineForTestingPadding ").join(String.fromCharCode(10));
+		const hugeText = "TextContentForTokenBudget".repeat(25000);
+		const msgs: Message[] = [
+			makeMsg("1", "tool", bulkOutput),
+			makeMsg("2", "user", hugeText),
+		];
+		const result = engine.microCompact(msgs);
+		const toolMsg = result.messages.find(function(m) { return m.role === "tool"; });
+		expect(toolMsg).toBeDefined();
+		const c = typeof toolMsg.content === "string" ? toolMsg.content : "";
+		expect(c).toContain("[tool output truncated:");
+		expect(result.tokensSaved).toBeGreaterThan(0);
+	});
+
+	it("preserves small tool outputs when evicting other content", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const tiny = "SmallOutputText";
+		const hugeText = "TextContentForTokenBudget".repeat(25000);
+		const msgs: Message[] = [
+			makeMsg("1", "tool", tiny),
+			makeMsg("2", "user", hugeText),
+		];
+		const result = engine.microCompact(msgs);
+		const toolMsg = result.messages.find(function(m) { return m.role === "tool"; });
+		expect(toolMsg).toBeDefined();
+		const c = typeof toolMsg.content === "string" ? toolMsg.content : "";
+		expect(c).toBe(tiny);
+	});
+
+	it("preserves user messages unchanged through micro-compaction", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const hugeText = "TextContentForTokenBudget".repeat(25000);
+		const msgs: Message[] = [
+			makeMsg("1", "user", "ImportantQuestionText"),
+			makeStructuredMsg("2", "assistant", [
+				{ type: "thinking", text: "ThinkingBlock" },
+				{ type: "text", text: hugeText },
+			]),
+		];
+		const result = engine.microCompact(msgs);
+		const userMsg = result.messages.find(function(m) { return m.role === "user"; });
+		expect(userMsg).toBeDefined();
+		const c = typeof userMsg.content === "string" ? userMsg.content : "";
+		expect(c).toBe("ImportantQuestionText");
+	});
+
+	it("saves tokens when stripping bulk tool output", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const bigTool = "A".repeat(7000);
+		const hugeText = "TextContentForTokenBudget".repeat(25000);
+		const msgs: Message[] = [
+			makeMsg("1", "tool", bigTool),
+			makeMsg("2", "user", hugeText),
+		];
+		const result = engine.microCompact(msgs);
+		expect(result.tokensSaved).toBeGreaterThan(0);
+		expect(result.filesCollapsed).toEqual([]);
+	});
+
+	it("preserves all input message IDs (none removed)", () => {
+		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
+		const hugeText = "TextContentForTokenBudget".repeat(25000);
+		const msgs: Message[] = [
+			makeMsg("1", "user", "Hello"),
+			makeMsg("2", "assistant", hugeText),
+			makeMsg("3", "tool", "SomeOutput"),
+		];
+		const result = engine.microCompact(msgs);
+		expect(result.messages.length).toBe(3);
+		const ids = result.messages.map(function(m) { return m.id; }).sort();
+		expect(ids).toEqual(["1", "2", "3"]);
+	});
 });
 
 // ─── compact (tier-aware) ─────────────────────────────────────────
