@@ -115,7 +115,10 @@ describe("microCompact", () => {
 
 	it("truncates bulk tool outputs when over budget", () => {
 		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
-		const bulkOutput = Array(150).fill("LongLineForTestingPadding ").join(String.fromCharCode(10));
+		// Must exceed both thresholds: content.length >= 5000 AND lines > 100
+		const longLine = "LongLineForTestingPaddingAndTruncationCheck "; // 47 chars
+		const bulkOutput = Array(150).fill(longLine).join(String.fromCharCode(10));
+		// 150 * 47 = 7050 chars + 149 newlines ≈ 7199 chars (>= 5000 ✓, > 100 lines ✓)
 		const hugeText = "TextContentForTokenBudget".repeat(25000);
 		const msgs: Message[] = [
 			makeMsg("1", "tool", bulkOutput),
@@ -163,7 +166,10 @@ describe("microCompact", () => {
 
 	it("saves tokens when stripping bulk tool output", () => {
 		const engine = new UltraCompactEngine({ modelName: "gpt-4o" });
-		const bigTool = "A".repeat(7000);
+		// Must exceed both thresholds: content.length >= 5000 AND lines > 100
+		const longLine = "LineContentForTruncationCheckAndTokenSavingTest "; // 51 chars
+		const bigTool = Array(110).fill(longLine).join(String.fromCharCode(10));
+		// 110 * 51 = 5610 chars + 109 newlines ≈ 5719 chars (>= 5000 ✓, > 100 lines ✓)
 		const hugeText = "TextContentForTokenBudget".repeat(25000);
 		const msgs: Message[] = [
 			makeMsg("1", "tool", bigTool),

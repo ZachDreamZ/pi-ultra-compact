@@ -982,7 +982,8 @@ export class UltraCompactEngine {
 
 	/**
 	 * Strip bulk tool outputs (large file reads, directory listings).
-	 * Only targets outputs > 100 lines or > 5000 characters of plain text.
+	 * Only targets outputs with > 100 lines AND > 5000 characters of plain text.
+	 * Both conditions must be met to avoid truncating compact single-line results.
 	 */
 	private stripBulkToolOutputs(messages: Message[]): Message[] {
 		return messages.map((msg) => {
